@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+
+
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <style>
+
+        .option{
+            border: black 1px solid;
+            font-size: xx-large;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="menu" style="width: auto;height: auto;background: cadetblue;position: absolute;display: none;">
+        <div class="option">yellow</div>
+        <div class="option">red</div>
+        <div class="option">blue</div>
+     
+
+
+    </div>
+
+    <script>
+        document.oncontextmenu = function (e) {
+            var x = e.clientX + 'px';
+            var y = e.clientY + 'px';
+            var node = document.querySelector('#menu');
+            node.style.left = x;
+            node.style.top = y;
+            node.style.display="block";
+            // node.style.width = 100 + 'px';
+            // node.style.height = 100 + 'px';
+            return false; //很重要，不能讓瀏覽器顯示自己的右鍵選單
+        }
+
+        document.onclick = function (e) {
+            if (e.target.id != 'menu') {
+                var node = document.querySelector('#menu');
+                node.style.display="none";
+                // node.style.width = 0;
+                // node.style.height = 0;
+            }
+        }
+        var options=document.querySelectorAll('.option');
+
+        for(o of options){
+
+            o.addEventListener('click',function(){alert('click:'+this.innerText);});
+        }
+
+
+       
+
+     
+
+        
+
+
+
+
+    </script>
+</body>
+
+</html>

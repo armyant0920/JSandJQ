@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+    <div id="menu" style="width: 0;height: 0;background: cadetblue;position: absolute">
+        </menu>
+
+        <script>
+            var menu = document.querySelector('#context-menu');
+            var menuState = 0;
+            var activate = 'context-menu--active';
+            var menuPosition;
+            var menuPositionX;
+            var menuPositionY;
+            var targetLi;
+            var menuNav = document.querySelector('#menu-context');
+
+            function init() {
+
+
+                //Li添加右鍵事件
+                contextListener();
+                //滑鼠左鍵點擊,左鍵單點後隱藏meni
+                clickListener();
+                //按下ESC隱藏menu
+                keyupListener();
+                //選單點擊事件
+                
+
+
+            }
+
+            //li添加又見事件
+            function contextListener() {
+
+                document.addEventListener('contextmenu', function (e) {
+                    if (clickInContextListener(e)) {
+
+                        e.preventDefault;
+                        targetLi = e.target;
+                        toggleMenuOn();
+                        positionMenu(e);
+
+
+                    } else {
+                        targetLi = null;
+                        toggleMenuOff();
+                    }
+                });
+            }
+
+
+
+            function toggleMenuOn() {
+
+                if (menuState !== 1) {
+
+                    menuState = 1;
+                    menu.classList.add(activate);
+                }
+
+            }
+
+
+            function toggleMenuOff() {
+                if (menuState !== 0) {
+
+                    menuState = 0;
+                    menu.classList.remove(activate);
+                }
+            }
+
+            function gettPosition(e) {
+
+                var posX = 0;
+                var posY = 0;
+                if (!e) var e = window.event;
+                if (e.pageX || e.pageY) {
+
+                    posX = e.pageX;
+                    posY = e.pageY;
+
+                } else if (e.clientX || e.clientY) {
+                    posX = e.clientX + document.body.scrollLeft + document.documentElement.scrollLeft;
+                    posY = e.clientY + document.body.scrollTop + document.documentElement.scrollTop;
+
+
+                }
+
+                return {
+
+                    x: posX,
+                    y: posY
+
+                };
+
+
+
+
+            }
+
+            function positionMenu(e) {
+
+                menuPosition = gettPosition(e);
+                menuPositionX = menuPosition.x + 'px';
+                menuPositionY = menuPosition.y + 'px';
+                menu.style.left = menuPositionX;
+                menu.style.top = menuPositionY;
+
+
+            }
+
+            function clickListener() {
+                document.addEventListener('click', function (e) {
+
+
+
+                    var code = e.which || e.button;
+                    if (code === 1) {
+                        toggleMenuOff();
+                    }
+
+
+                })
+
+            }
+
+            function keyupListener() {
+
+
+                window.addEventListener('keyup', function (e) {
+
+                    //按下ESC
+                    if (e.keyCode === 27) {
+                        toggleMenuOff();
+                    }
+                })
+            }
+
+            function clickInContextListener(e) {
+                var target = e.target || e.srcElement;
+                while (target) {
+
+
+                    if (target.nodeName.toUpperCase() === 'LI') {
+
+                        return true;
+
+                    }
+                }
+                return false;
+            }
+
+           
+
+
+
+
+        </script>
+</body>
+
+</html>
