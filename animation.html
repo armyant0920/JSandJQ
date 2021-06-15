@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <script type="text/javascript"></script>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JavaScript Animation</title>
+    <script src="../js/jquery-3.5.1.min.js"></script>
+    <script>
+        var picker = null;
+
+        /*$(function () {
+             $('img').click(function () {
+                 if (picker != null) {
+                     console.log('消除old');
+                     picker.attr("src", "Images/star.gif");
+                     picker.attr('activate', "N");
+ 
+                 }
+                 if ($(this).attr('activate') == 'N') {
+                     $(this).attr('src', "Images/chngstar.gif");
+                     $(this).attr('activate', "Y");
+ 
+ 
+                 } else {
+                     $(this).attr("src", "Images/star.gif");
+                     $(this).attr('activate', "N");
+                     picker = null;
+ 
+ 
+ 
+                 }
+                 console.log(`${this.id} is click`);
+ 
+ 
+ 
+             });
+         });*/
+        $(document).on('click', 'img', function () {
+
+            if (picker != null) {
+                console.log('消除old');
+                picker.attr("src", "Images/star.gif");
+                picker.attr('activate', "N");
+                picker = null;
+
+            }
+            if ($(this).attr('activate') == 'N') {
+                $(this).attr('src', "Images/chngstar.gif");
+                $(this).attr('activate', "Y");
+                picker = $(this);
+
+
+            } else {
+                $(this).attr("src", "Images/star.gif");
+                $(this).attr('activate', "N");
+                picker = null;
+
+
+
+            }
+            console.log(`${this.id} is click`);
+
+            //console.log('YYYY');
+
+        });
+
+
+        var pointX;
+        var pointY;
+
+        //需要一個滑鼠監聽右鍵事件,在有點選物件的情況下,點右鍵使之往指定位置移動
+
+        document.oncontextmenu = function (e) {
+
+
+            if (picker) {
+
+                pointX = e.clientX;
+                console.log(`pointX=${pointX}`);
+                
+                //var x = e.clientX + 'px';
+                pointY = e.clientY;
+                console.log(`pointY=${pointY}`);
+               // var y = e.clientY + 'px';
+                /*pointX = e.clientX;
+                var x = e.clientX + 'px';
+                pointY = e.clientY;
+                var y = e.clientY + 'px';
+                picker.css('left', x);
+                picker.css('top', y);*/
+                moveToPoint();
+
+                //let d = (picker.prop('degs') + 30) % 360;
+                //console.log(d);
+                //picker.prop('degs', d);
+                //console.log(`deg:${d}`);
+
+                // let m=picker.css('transform');
+                //console.log(m);
+                // let d=getmatrix(picker.css('transform'));
+                //  console.log('d='+d);
+                //if(d=='none')d=0;
+                var deg = 0;
+                if (picker.css('transform') == 'none') {
+                    deg = 0;
+                } else {
+                    deg = eval('get' + picker.css('transform'));//構造getmatrix函式,返回上次旋轉度數
+
+                }
+
+                picker.css({ 'transform': 'rotate(' + (deg + 30) % 360 + 'deg)' });
+                // d=picker.css('transform');
+
+
+                // picker.css({'transform':'rotate('+(deg+30)%360+'deg)'});
+                //picker.style.left = x;
+                //picker.style.top = y;
+                //node.style.display = "block";
+                // node.style.width = 100 + 'px';
+                // node.style.height = 100 + 'px';
+                return false; //很重要，不能讓瀏覽器顯示自己的右鍵選單
+
+            }
+
+
+        }
+        //取角度
+        function getmatrix(a, b, c, d, e, f) {
+            console.log(`a=${a},b=${b},c=${c},d=${d},e=${e},f=${f}`);
+            var aa = Math.round(180 * Math.asin(a) / Math.PI);
+            var bb = Math.round(180 * Math.acos(b) / Math.PI);
+            var cc = Math.round(180 * Math.asin(c) / Math.PI);
+            var dd = Math.round(180 * Math.acos(d) / Math.PI);
+            var deg = 0;
+            if (aa == bb || -aa == bb) {
+                deg = dd;
+            } else if (-aa + bb == 180) {
+                deg = 180 + cc;
+            } else if (aa + bb == 180) {
+                deg = 360 - cc || 360 - dd;
+            }
+            console.log(`deg=${deg}`);
+            return deg >= 360 ? 0 : deg;
+            //return (aa+','+bb+','+cc+','+dd);
+        }
+
+
+        var imgObj = null;
+        var animate;
+        function init() {
+            imgObj = document.getElementById('myImage');
+            imgObj2 = document.getElementById('myImage2');
+            imgObj.style.position = 'absolute';
+            $('myImage').prop('degs', 0);
+            $('myImage2').prop('degs', 0);
+
+            imgObj2.style.position = 'absolute';
+
+            imgObj.style.left = '0px';
+            imgObj2.style.left = '100px';
+        }
+        function moveRight() {
+
+            let left = parseInt(imgObj.style.left);
+            if (left <= 1000) {
+                imgObj.style.left = left + 10 + 'px';
+                animate = setTimeout(moveRight, 20); // call moveRight in 20msec
+            } else {
+                imgObj.style.left = 1000 + 'px';
+
+            }
+
+
+        }
+
+        function stopMove() {
+
+            clearTimeout(animate);
+
+        }
+
+        function moveToPoint() {
+
+            //let left = parseInt(picker.style.left);
+            // let top = parseInt(picker.style.top);
+
+            let left = parseInt(picker.offset().left);
+            let top = parseInt(picker.offset().top);
+            // console.log(`left=${left}`);
+            // console.log(`top=${top}`);
+
+            if (left != pointX || top != pointY) {
+                //粗糙的左右位移
+                if (left < pointX) {
+
+                    left = Math.min(left + 10, pointX);
+
+                } else if (left > pointX) {
+
+                    left = Math.max(left - 10, pointX);
+
+                }
+
+
+
+                //粗糙的上下位移
+                if (top < pointY) {
+
+                   top = Math.min(top + 10, pointY);
+                    //picker.style.top = Math.min(top + 10, pointY) + 'px';
+
+                } else if (top > pointY) {
+
+                   top = Math.max(top - 10, pointY);
+
+                    // picker.style.top = Math.min(top - 10, pointY) + 'px';
+
+                }
+                console.log(`top=${top},left=${left}`);
+
+                picker.offset({top:top,left:left});
+
+                animate = setTimeout(moveToPoint, 20); // call moveRight in 20msec
+
+            }else{
+                stopMove();
+
+
+            }
+
+
+
+
+
+
+        }
+
+
+        function stop() {
+            clearTimeout(animate);
+            imgObj.style.left = '0px';
+        }
+        window.onload = init;
+
+    </script>
+</head>
+
+<body>
+    <div>
+        <img id="myImage" activate="N" src="../Images/star.gif" />
+        <img id="myImage2" activate="N" src="../Images/star.gif" />
+        <div style="padding-top: 200px;">
+            <p>Click the buttons below to handle animation</p>
+            <input type="button" value="Start" onclick="moveRight();" />
+            <input type="button" value="Stop" onclick="stop();" />
+        </div>
+
+    </div>
+
+
+</body>
+
+</html>
