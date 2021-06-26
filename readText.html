@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="js/jquery.js"></script>
+</head>
+<body>
+    
+<div id='test'>XXXX</div>
+
+<p> <input id="myfile"  type="file"     /></p>
+<textarea  id="fileContent" cols="68" rows="10"  ></textarea>
+
+<button id='btn'>JQUERY讀取</button>
+
+<div id='board'></div>
+
+
+<script>
+var myText='';
+$(document).ready(function(){
+
+    $('#btn').click(function(){
+
+        $('#board').load('/EEITLabsrc(20200812)/homework/document/C20v2.txt');
+        
+        let text=document.getElementById('board').innerText;
+        // let lines=text.split('/\r\n');
+        let lines=ReplaceAll(text,'\n','<br/>')
+        console.log("line:"+lines);
+
+        // for(line in lines){
+
+        //     console.log("line:"+line);
+        // }
+        
+
+
+    });
+
+    // $('btn2').click(function(){
+
+    //     var txtFile='/EEITLabsrc(20200812)/homework/document/C20v2.txt';
+    //     var file = new File(txtFile);
+    //     file.op
+
+
+    // });
+
+
+});
+
+window.onload = function () {
+    document.getElementById('myfile').onchange = readText;
+};
+
+
+  
+    
+  
+    function readText(){
+        file = this.files[0];
+    var fReader = new FileReader();           
+    fReader.onload = function (event) {
+        document.getElementById('fileContent').value = event.target.result;
+    };
+    fReader.readAsText(file);
+    
+
+
+    }
+
+    function ReplaceAll(strOrg,strFind,strReplace)
+{
+    return strOrg.replace(new RegExp(strFind,"g"),strReplace);
+}
+    
+    </script>
+
+
+</body>
+
+
+</html>
