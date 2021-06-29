@@ -2,14 +2,195 @@
 <html lang="en">
 
 <head>
+
     <script type="text/javascript"></script>
     <meta charset="UTF-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JavaScript Animation</title>
     <script src="../js/jquery-3.5.1.min.js"></script>
+
+</head>
+
+<body style="margin: 0;padding: 0;">
+    <canvas id="canvas" width="window.innerWidth" height="window.innerHeight"></canvas>
+    <div id="area">
+
+        <img id="myImage" activate="N" src="../Images/star.gif" />
+        <img id="myImage2" activate="N" src="../Images/star.gif" />
+        <div style="padding-top: 200px;">
+            <p>Click the buttons below to handle animation</p>
+            <input type="button" value="Start" onclick="moveRight();" />
+            <input type="button" value="Stop" onclick="stop();" />
+        </div>
+
+    </div>
+
     <script>
         var picker = null;
+        var mouseX;
+        var mouseY;
+        var canvas = document.getElementById("canvas");
+
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        var ctx = canvas.getContext("2d");
+
+        var source = document.createElement("img");
+        var item   = document.createElement('img');
+
+        source.src = "images/role.png";
+        item.src="images/item.png";
+
+        function createItem(){
+
+            let x=Math.floor(Math.random()*16);
+            let y=Math.floor(Math.random()*19);
+            let size=32;
+            ctx.clearRect(0,0,size*2,size*2);    
+            ctx.drawImage(item,x*size,y*size,size,size,0,0,size*2,size*2);
+          
+
+         
+            
+        }
+        
+
+        $("html").mousemove(function (e) {
+
+            //mouseX=$(this).offset().left;
+            mouseX = e.clientX;
+            mouseY = e.clientY;
+            // mouseY=$(this).offset().top;
+            //console.log(`mouseX${mouseX},mouseY${mouseY}`)
+
+
+        })
+
+        //橫*4,直*2 動作3個一組
+        class role {
+            //direction:0=down 1=left 2=right 3=up
+            //action:0 1(idle) 2 
+            mDiv = null;
+            mCanvas = null;
+            mCtx = null;
+            name;
+            posX = 0;
+            posY = 0;
+            direction = 0;
+            action = 1;
+            roleX;
+            roleY;
+            size = 36;
+            timer;
+            //interval;
+
+
+            block = true;
+            constructor(name, posX, posY) {
+                this.name = name;
+                this.posX = posX;
+                this.posY = posY;
+                this.randomRole();
+                // this.timer=setInterval(this.drawRole,1000);
+                this.mDiv = document.createElement('div');
+                this.mDiv.className = "roleDiv"
+                this.mDiv.style.position = 'absolute';
+                this.mDiv.style.width = '72px';
+                this.mDiv.style.height = '72px';
+                this.mDiv.style.borderWidth = "1px 5px 10px 20px"
+                this.mDiv.style.left = (posX) + "px";
+                this.mDiv.style.top = (posY) + "px";
+                this.mCanvas = document.createElement("canvas");
+
+              
+                this.mCanvas.width=72;
+                this.mCanvas.height=72;
+                //this.mCanvas.style.width=(this.size*2)+'px';
+                //this.mCanvas.style.height=(this.size*2)+'px';
+                  
+                this.mDiv.appendChild(this.mCanvas);
+                this.mDiv.addEventListener('click',function(){alert(this.name)});
+                this.mCtx = this.mCanvas.getContext("2d");
+                // this.mCanvas.style.width="72px";
+                // this.mCanvas.style.height="72px";
+
+                document.body.insertBefore(this.mDiv, document.getElementById('area'));
+                this.timer = setInterval(drawRole, 1000, this);
+                // timer.start();
+                // this.drawRole();
+                console.log(`name=${this.name}, posX = ${this.posX}, posY = ${this.posY}, 外觀 = ${this.roleX} /${this.roleY}`);
+
+
+            }
+
+            randomRole() {
+
+                this.roleX = Math.floor(Math.random() * 4);
+                this.roleY = Math.floor(Math.random() * 2);
+                //X部分,roleX*3取得是大圖的哪一個角色X範圍,並+action決定目前動作
+
+            }
+
+            /*drawRole() {
+
+                this.direction = Math.floor(Math.random() * 4);
+                console.log(`direction=${this.direction}`);
+                console.log(`draw:${this.size * (3 * this.roleX + this.action)},
+                 ${this.size * (4 * this.roleY + this.direction)},
+                 ${this.posX},
+                 ${this.posY}, 
+                 
+                 
+                 `)
+                ctx.drawImage(
+                    source,
+                    this.size * (3 * this.roleX + this.action),
+                    this.size * (4 * this.roleY + this.direction),
+                    this.size,
+                    this.size,
+                    this.posX,
+                    this.posY,
+                    this.size * 2,
+                    this.size * 2)
+            }*/
+
+
+
+        }
+
+        function drawRole(role) {
+
+            role.direction = Math.floor(Math.random() * 4);
+            console.log(`XXXdirection=${role.direction}`);
+            console.log(`draw:${role.size * (3 * role.roleX + role.action)},
+            ${role.size * (4 * role.roleY + role.direction)},
+            ${role.posX},
+            ${role.posY},  `);
+
+            //role.mCtx.clearRect(role.posX,role.posY,role.size*2,role.size*2);
+            role.mCtx.clearRect(0, 0, role.size * 2, role.size * 2);
+
+            role.mCtx.drawImage(
+                source,
+                role.size * (3 * role.roleX + role.action),
+                role.size * (4 * role.roleY + role.direction),
+                role.size,
+                role.size,
+                0,
+                0,
+                // role.posX,
+                // role.posY,
+                role.size*2,
+                role.size*2);
+        }
+
+
+
+        function create(name) {
+
+            let r = new role(name, mouseX, mouseY);
+        }
 
         /*$(function () {
              $('img').click(function () {
@@ -68,6 +249,18 @@
         });
 
 
+       /* $(document).on('click', '.roleDiv', function () {
+            $(this).css({"border-color": "#C1E0FF", 
+             "border-weight":"1px", 
+             "border-style":"solid"});
+       
+            
+
+    
+
+        });*/
+
+
         var pointX;
         var pointY;
 
@@ -80,11 +273,11 @@
 
                 pointX = e.clientX;
                 console.log(`pointX=${pointX}`);
-                
+
                 //var x = e.clientX + 'px';
                 pointY = e.clientY;
                 console.log(`pointY=${pointY}`);
-               // var y = e.clientY + 'px';
+                // var y = e.clientY + 'px';
                 /*pointX = e.clientX;
                 var x = e.clientX + 'px';
                 pointY = e.clientY;
@@ -209,32 +402,27 @@
                 //粗糙的上下位移
                 if (top < pointY) {
 
-                   top = Math.min(top + 10, pointY);
+                    top = Math.min(top + 10, pointY);
                     //picker.style.top = Math.min(top + 10, pointY) + 'px';
 
                 } else if (top > pointY) {
 
-                   top = Math.max(top - 10, pointY);
+                    top = Math.max(top - 10, pointY);
 
                     // picker.style.top = Math.min(top - 10, pointY) + 'px';
 
                 }
                 console.log(`top=${top},left=${left}`);
 
-                picker.offset({top:top,left:left});
+                picker.offset({ top: top, left: left });
 
                 animate = setTimeout(moveToPoint, 20); // call moveRight in 20msec
 
-            }else{
+            } else {
                 stopMove();
 
 
             }
-
-
-
-
-
 
         }
 
@@ -246,19 +434,6 @@
         window.onload = init;
 
     </script>
-</head>
-
-<body>
-    <div>
-        <img id="myImage" activate="N" src="../Images/star.gif" />
-        <img id="myImage2" activate="N" src="../Images/star.gif" />
-        <div style="padding-top: 200px;">
-            <p>Click the buttons below to handle animation</p>
-            <input type="button" value="Start" onclick="moveRight();" />
-            <input type="button" value="Stop" onclick="stop();" />
-        </div>
-
-    </div>
 
 
 </body>
