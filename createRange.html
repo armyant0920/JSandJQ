@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+
+
+
+
+    <!-- 实例一： -->
+    <div>
+        <span>ex1</span>
+
+        <button onclick="alert('aaa')";>AAA</button>
+    <from>
+
+        <textarea cols=50 rows=15>
+
+         哈哈。我们都是新生来得。大家都来相互帮助呀。这样我们才能进步，我们才能赚大钱！
+
+        </textarea>
+
+        <input type='button' value='select text' onclick="alert(document.selection.createRange().text)" > 
+        <!---->
+    
+        </from>
+    </div>
+
+
+
+        <!-- 实例二： -->
+
+        <div>
+            <span>ex2</span>
+
+            <textarea name="textfield" cols="50" rows="6">
+
+                就是现在文本域里有一段文字，当你选种其中几个字后点击一个按钮或者链接会弹出一个对话框，对话框的信息就是你选中的文字 哪位老大能解决的呀?请多多帮忙!!!谢谢
+
+            </textarea>
+
+            <input type="button" value="showSelection" οnclick="alert(document.selection.createRange().text)"> <input
+                type="button" value="showclear" οnclick="alert(document.selection.clear().text)">
+
+            <input type="button" value="showtype" οnclick="alert(document.selection.type)">
+
+            <textarea name="textfield" cols="50" rows="6" οnselect="alert(document.selection.createRange().text)">
+
+就是现在文本域里有一段文字，当你选种其中几个字后点击一个按钮或者链接会弹出一个对话框，对话框的信息就是你选中的文字 哪位老大能解决的呀?请多多帮忙!!!谢谢
+
+</textarea>
+</div>>
+
+
+
+        <!-- 实例三：选中Input中的文本 -->
+        <!-- 对textarea中的内容，进行选中后，加效果 -->
+        <input type='text' id='test' name='test'><input type=button οnclick='test2()' value='test' name='test3'>
+
+
+        <input type="button" value="加粗" οnclick="bold();" />
+        <textarea name="description" style="width: 436px; height: 296px">选中我，点击加粗</textarea>
+
+
+
+
+        <!-- 实例四：javascript捕获到选中的网页中的纯文本内容 -->
+
+        <script>
+
+
+            function test2() {
+                var t = document.getElementById("test")
+                var o = t.createTextRange()
+                alert(o.text)
+                o.moveStart("character", 2)
+                alert(o.text)
+                o.select()
+            }
+
+
+
+
+            function bold() {
+                Qr = document.selection.createRange().text;
+                if (!Qr || document.selection.createRange().parentElement().name != 'description') {
+                    txt = prompt('Text to be made BOLD.', '');
+                    if (txt != null && txt != '') document.form1.description.value += '' + txt + '';
+                }
+                else {
+                    document.selection.createRange().text = '' + document.selection.createRange().text + '';
+                    document.selection.empty();
+                }
+            }
+
+
+
+
+
+
+            /*
+            <meta http-equiv="Content-Type" content="text/html; charset=gb2312" />
+            <title>鼠标取词</title>
+            <script>
+            function getSel() {
+            var t=window.getSelection?window.getSelection():(document.getSelection?document.getSelection():(document.selection?document.selection.createRange().text:""))
+            document.forms[0].selectedtext.value = t;
+            }
+            
+            
+            </head>
+            <body οnmοuseup="getSel()">
+            <form>
+            <textarea name="selectedtext" rows="5" cols="50"></textarea>
+            </form>
+            以上的代码可以捕获到选中的网页中的纯文本内容(不含HTML标签)
+            如果想获得包含html的内容，将document.selection.createRange().text改成document.selection.createRange().htmlText*/
+
+        </script>
+</body>
+
+</html>

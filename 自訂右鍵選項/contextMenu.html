@@ -18,6 +18,8 @@
 </head>
 
 <body>
+
+    <div  id="main" style="background-color: black;width: 100vw;height: 100vh;margin: auto;">
     <div id="menu" style="width: auto;height: auto;background: cadetblue;position: absolute;display: none;">
         <div class="option">yellow</div>
         <div class="option">red</div>
@@ -25,6 +27,7 @@
      
 
 
+    </div>
     </div>
 
     <script>
@@ -52,11 +55,15 @@
 
         for(o of options){
 
-            o.addEventListener('click',function(){alert('click:'+this.innerText);});
+            o.addEventListener('click',function(){alert('click:'+this.innerText);changeColor(this.innerText);});
         }
 
 
-       
+       function changeColor(color){
+
+            document.getElementById('main').style.backgroundColor=color;
+
+       }
 
      
 

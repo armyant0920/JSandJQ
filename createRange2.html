@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+
+<body>
+
+    <textarea cols=50 rows=15>測試內容!</textarea>
+    <input type=button id='test' value=選擇字後點擊我看看 onclick='getRange(this.id);'>
+    <!-- alert(document.selection.createRange().text) -->
+
+
+    <textarea name="textfield" cols="50" rows="6">就是現在文字域裡有一段文字,當你選種其中幾個字後點擊一個按鈕或者連結會彈出一個對話方塊,對話方塊的資訊就是你選中的文字
+            哪位老大能解決的呀?請多多幫忙!!!謝謝
+            </textarea>
+    <input type="button" value="showSelection" onclick="alert(document.selection.createRange().text)">
+    <input type="button" value="showclear" onclick="alert(document.selection.clear().text)">
+    <input type="button" value="showtype" onclick="alert(document.selection.type)">
+    <textarea name="textfield" cols="50" rows="6" onselect="alert(document.selection.createRange().text)">就是現在文字域裡有一段文字,當你選種其中幾個字後點擊一個按鈕或者連結會彈出一個對話方塊,對話方塊的資訊就是你選中的文字
+            哪位老大能解決的呀?請多多幫忙!!!謝謝
+            </textarea>
+
+</body>
+<script>
+    function getRange(containerid) {
+        if (document.selection) { //IE
+            console.log('IE');
+            var range = document.body.createTextRange();
+            range.moveToElementText(document.getElementById(containerid));
+            range.select();
+            alert(range.text);
+        } else if (window.getSelection) { //others
+            console.log('other');
+            var range = document.createRange();
+            range.selectNode(document.getElementById(containerid));
+            window.getSelection().addRange(range);
+            alert(range.text);
+            console.log(`${range.text}`)
+        }
+    }
+
+</script>
+
+</html>
