@@ -110,7 +110,11 @@
     const n = reach.get(x + ',' + y);
     if (!n || !n.stop) return null;
     const path = R.pathTo(reach, x, y);
-    u.prevPos = { x: u.x, y: u.y };
+    if (!u.prevPos) u.prevPos = { x: u.x, y: u.y };
+    if (path.length > 1) {
+      const a = path[path.length - 2], z = path[path.length - 1];
+      u.dir = z.y > a.y ? 0 : z.x < a.x ? 1 : z.x > a.x ? 2 : 3;
+    }
     u.x = x; u.y = y; u.moved = true;
     return path;
   }
@@ -119,32 +123,56 @@
     if (u.prevPos && !u.acted) { u.x = u.prevPos.x; u.y = u.prevPos.y; u.moved = false; delete u.prevPos; }
   }
 
-  // 選擇可在距離 d 使用的武器（威力最高者）
+  // 選擇可在距離 d 使用的攻擊武器（威力最高者）
   function autoEquip(b, u, d) {
     let best = -1, bestMt = -1;
-    u.weapons.forEach((id, i) => {
-      const w = b.campaign.weapons[id];
-      if (w && R.canHitAt(w, d) && (w.mt || 0) > bestMt) { best = i; bestMt = w.mt || 0; }
-    });
+    for (const { i, w } of R.attackWeapons(b, u)) if (R.canHitAt(w, d) && (w.mt || 0) > bestMt) { best = i; bestMt = w.mt || 0; }
     if (best >= 0) u.equip = best;
     return best >= 0;
   }
 
+  // 距離 d 可用的攻擊武器清單 [{i, w}]
+  function weaponsFor(b, u, d) { return R.attackWeapons(b, u).filter((x) => R.canHitAt(x.w, d)); }
+
   function targetsFrom(b, u) {
-    return living(b).filter((o) => !R.friendly(o.team, u.team) &&
-      u.weapons.some((id) => R.canHitAt(b.campaign.weapons[id], dist(u, o))));
+    return living(b).filter((o) => !R.friendly(o.team, u.team) && weaponsFor(b, u, dist(u, o)).length);
   }
 
-  function previewAttack(b, u, t) {
-    autoEquip(b, u, dist(u, t));
-    autoEquip(b, t, dist(u, t));
+  // weaponIdx 指定攻擊方武器（玩家在預測畫面切換）
+  function previewAttack(b, u, t, weaponIdx) {
+    const d = dist(u, t);
+    if (weaponIdx != null && weaponsFor(b, u, d).some((x) => x.i === weaponIdx)) u.equip = weaponIdx;
+    else autoEquip(b, u, d);
+    autoEquip(b, t, d);
     return R.forecast(b, u, t);
   }
 
-  // 可執行的行動清單
+  // 杖可治療的對象
+  function healTargets(b, u) {
+    const st = R.staves(b, u);
+    if (!st.length) return [];
+    return living(b).filter((o) => o !== u && R.friendly(o.team, u.team) && o.hp < o.stats.hp &&
+      st.some(({ w }) => R.canHitAt(w, dist(u, o))));
+  }
+
+  function tradePartners(b, u) {
+    return living(b).filter((o) => o !== u && o.team === u.team && dist(o, u) === 1);
+  }
+
+  function spiritsUsable(b, u) {
+    if (!R.rulesOf(b).spirits || u.team !== 'player') return [];
+    return (u.spirits || []).map((id) => Object.assign({ id }, b.campaign.spirits[id])).filter((s) => s.effect);
+  }
+
+  // 可執行的行動清單（free:true 表示不會結束行動）
   function actionsFor(b, u) {
     const acts = [];
     if (targetsFrom(b, u).length) acts.push({ id: 'attack', name: '攻擊' });
+    if (healTargets(b, u).length) acts.push({ id: 'staff', name: '杖' });
+    const sp = spiritsUsable(b, u);
+    if (sp.length) acts.push({ id: 'spirit', name: '精神', free: true, disabled: !sp.some((s) => (s.cost || 0) <= u.sp) });
+    if ((u.items || []).length) acts.push({ id: 'item', name: '道具' });
+    if (u.team === 'player' && tradePartners(b, u).length) acts.push({ id: 'trade', name: '交換', free: true });
     const talkTo = living(b).filter((o) => o !== u && dist(o, u) === 1 && hasEvent(b, 'talk', { a: u.id, b: o.id }));
     if (u.team === 'player' && talkTo.length) acts.push({ id: 'talk', name: '交談', targets: talkTo.map((o) => o.uid) });
     if (u.team === 'player' && hasEvent(b, 'visit', { x: u.x, y: u.y })) acts.push({ id: 'visit', name: '拜訪' });
@@ -157,26 +185,109 @@
   function finishAction(b, u) {
     u.acted = true;
     delete u.prevPos;
+    if (u.buffs) delete u.buffs.accel;
     checkOutcome(b);
   }
 
+  function gainExp(b, me, e, res) {
+    if (me.team !== 'player' || me.hp <= 0 || !e) return;
+    if (me.buffs && me.buffs.effort) { e = Math.min(100, e * 2); delete me.buffs.effort; }
+    res.exp[me.uid] = e;
+    const ups = R.addExp(b, me, e, b.rng);
+    if (ups.length) res.levelUps[me.uid] = ups;
+  }
+
   // 攻擊：回傳 { combat, exp:{uid:amount}, levelUps:{uid:[gains]}, deaths:[unit] }
-  function attack(b, u, t) {
-    previewAttack(b, u, t);
+  function attack(b, u, t, weaponIdx) {
+    previewAttack(b, u, t, weaponIdx);
     const combat = R.resolveCombat(b, u, t, b.rng);
     const res = { combat, exp: {}, levelUps: {}, deaths: [] };
     for (const [me, foe] of [[u, t], [t, u]]) {
-      if (me.team !== 'player' || me.hp <= 0) continue;
       const didHit = combat.strikes.some((s) => s.by === me.uid && s.hit);
       const killed = foe.hp <= 0;
-      const e = R.expGain(me, foe, didHit, killed);
-      res.exp[me.uid] = e;
-      const ups = R.addExp(b, me, e, b.rng);
-      if (ups.length) res.levelUps[me.uid] = ups;
+      R.addMorale(b, me, 1 + (didHit ? 1 : 0) + (killed ? 3 : 0));
+      gainExp(b, me, R.expGain(me, foe, didHit, killed), res);
     }
     for (const d of [u, t]) if (d.hp <= 0) { res.deaths.push(d); fire(b, 'death', { unit: d.id }); }
     finishAction(b, u);
     return res;
+  }
+
+  // 杖：回傳 { amount, exp, levelUps }
+  function heal(b, u, t, staffIdx) {
+    const st = R.staves(b, u).filter(({ w }) => R.canHitAt(w, dist(u, t)));
+    const pick = st.find((x) => x.i === staffIdx) || st[0];
+    if (!pick) return null;
+    const amount = Math.min(t.stats.hp - t.hp, R.healAmount(b, u, pick.w));
+    t.hp += amount;
+    const res = { amount, exp: {}, levelUps: {} };
+    gainExp(b, u, 11 + Math.floor(amount / 2), res);
+    finishAction(b, u);
+    return res;
+  }
+
+  // 使用道具（會結束行動）。回傳 { text } 說明效果
+  function useItem(b, u, idx, opts) {
+    const it = (u.items || [])[idx];
+    const def = it && b.campaign.items[it.id];
+    if (!def) return null;
+    let text = '';
+    switch (def.kind) {
+      case 'heal': { const n = Math.min(u.stats.hp - u.hp, def.power || 10); u.hp += n; text = `HP +${n}`; break; }
+      case 'boost': { const k = def.stat || 'str', n = def.power || 1; u.stats[k] += n; if (k === 'hp') u.hp += n; text = `${C.STAT_NAMES[k] || k} +${n}`; break; }
+      case 'sp': { const n = Math.min(u.maxSp - u.sp, def.power || 10); u.sp += n; text = `SP +${n}`; break; }
+      case 'morale': R.addMorale(b, u, def.power || 10); text = `氣力 +${def.power || 10}`; break;
+      default: text = def.name;
+    }
+    it.uses = (it.uses || 1) - 1;
+    if (it.uses <= 0) u.items.splice(idx, 1);
+    if (!(opts && opts.free)) finishAction(b, u);
+    return { text };
+  }
+
+  // 交換：把 from 的 weapons/items 第 idx 項移到 to（不結束行動）
+  function transfer(b, from, to, kind, idx) {
+    const list = kind === 'weapon' ? from.weapons : from.items;
+    if (!list || idx < 0 || idx >= list.length) return false;
+    const [x] = list.splice(idx, 1);
+    if (kind === 'weapon') { to.weapons.push(x); from.equip = 0; }
+    else (to.items = to.items || []).push(x);
+    return true;
+  }
+
+  // 精神指令（不結束行動）。target 為 'ally' 型指令的對象。回傳 { text, targets:[unit] } 或 { error }
+  function useSpirit(b, u, spiritId, target) {
+    const sp = b.campaign.spirits[spiritId];
+    if (!sp || !(u.spirits || []).includes(spiritId)) return { error: '沒有這個精神指令' };
+    const cost = sp.cost || 0;
+    if (u.sp < cost) return { error: 'SP 不足' };
+    const eff = R.EFFECTS[sp.effect];
+    if (!eff) return { error: '未知效果' };
+    let targets = [u];
+    if (sp.target === 'ally') {
+      if (!target || target.hp <= 0 || !R.friendly(target.team, u.team)) return { error: '需要選擇同伴' };
+      targets = [target];
+    } else if (sp.target === 'allies') targets = living(b).filter((o) => R.friendly(o.team, u.team));
+    let text = sp.name;
+    for (const t of targets) {
+      t.buffs = t.buffs || {};
+      switch (sp.effect) {
+        case 'heal': { const n = Math.min(t.stats.hp - t.hp, sp.value || 10); t.hp += n; text = `HP +${n}`; break; }
+        case 'morale': R.addMorale(b, t, sp.value || 10); text = `氣力 +${sp.value || 10}`; break;
+        case 'sp': t.sp = Math.min(t.maxSp, t.sp + (sp.value || 10)); text = 'SP 回復'; break;
+        case 'accel': t.buffs.accel = sp.value || 3; break;
+        default: t.buffs[sp.effect] = true;
+      }
+    }
+    u.sp -= cost;
+    return { text, targets };
+  }
+
+  // 指令可選的對象（ally 型）
+  function spiritTargets(b, u, spiritId) {
+    const sp = b.campaign.spirits[spiritId];
+    if (!sp || sp.target !== 'ally') return [];
+    return living(b).filter((o) => o !== u && R.friendly(o.team, u.team));
   }
 
   function talk(b, u, other) { fire(b, 'talk', { a: u.id, b: other.id }); finishAction(b, u); }
@@ -190,6 +301,7 @@
     const msgs = [];
     for (const u of living(b, phase)) {
       u.acted = false; u.moved = false; delete u.prevPos;
+      if (u.buffs) for (const k of Object.keys(u.buffs)) if ((R.EFFECTS[k] || {}).kind === 'turn') delete u.buffs[k];
       const t = R.terrainAt(b, u.x, u.y);
       if (t && t.heal && u.hp < u.stats.hp) {
         const h = Math.min(u.stats.hp - u.hp, Math.ceil(u.stats.hp * t.heal / 100));
@@ -250,7 +362,7 @@
     for (const u of b.units) {
       if (u.team !== 'player') continue;
       roster[u.id] = {
-        level: u.level, exp: u.exp, stats: clone(u.stats), weapons: clone(u.weapons),
+        level: u.level, exp: u.exp, stats: clone(u.stats), weapons: clone(u.weapons), items: clone(u.items || []),
         dead: permadeath && u.hp <= 0,
       };
     }
@@ -265,16 +377,21 @@
     return u;
   }
 
-  function give(b, unitId, weaponId) {
+  // 給予武器或道具（id 在 weapons 或 items 中皆可）
+  function give(b, unitId, id) {
     const u = b.units.find((x) => x.id === unitId && x.hp > 0);
-    if (u && b.campaign.weapons[weaponId]) u.weapons.push(weaponId);
+    if (!u) return null;
+    if (b.campaign.weapons[id]) u.weapons.push(id);
+    else if (b.campaign.items[id]) (u.items = u.items || []).push({ id, uses: b.campaign.items[id].uses || 1 });
+    else return null;
     return u;
   }
 
   SRPG.battle = {
     PHASES, PHASE_NAMES, createBattle, attach, serialize, restore, addUnit, living, byUid,
-    fire, hasEvent, moveUnit, undoMove, autoEquip, targetsFrom, previewAttack, actionsFor,
-    attack, talk, visit, seize, wait, startPhase, endPhase, phaseDone, checkOutcome,
+    fire, hasEvent, moveUnit, undoMove, autoEquip, weaponsFor, targetsFrom, previewAttack, actionsFor,
+    healTargets, tradePartners, spiritsUsable, spiritTargets,
+    attack, heal, useItem, transfer, useSpirit, talk, visit, seize, wait, startPhase, endPhase, phaseDone, checkOutcome,
     objectiveText, commitRoster, spawn, recruit, give,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = SRPG;

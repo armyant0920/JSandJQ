@@ -242,7 +242,10 @@ test('示範第一章：雙方全自動對打能正常結束', () => {
         const p = AI.plan(b, Object.assign(u, { ai: u.team === 'player' ? 'aggressive' : u.ai }));
         if (p.x !== u.x || p.y !== u.y) B.moveUnit(b, u, p.x, p.y);
         const t = p.target && B.byUid(b, p.target);
-        if (t && t.hp > 0) B.attack(b, u, t); else B.wait(b, u);
+        if (t && t.hp > 0) B.attack(b, u, t);
+        else if (p.heal) B.heal(b, u, B.byUid(b, p.heal));
+        else if (p.item != null) B.useItem(b, u, p.item);
+        else B.wait(b, u);
       }
       if (b.status === 'playing') B.endPhase(b);
     }
@@ -256,4 +259,117 @@ test('條件出場：未說服的角色不會出現在下一章', () => {
   assert.ok(!b1.units.some((u) => u.id === 'kit'));
   const b2 = B.createBattle(c, 'ch2a', { flags: { kit_joined: true }, seed: 1 });
   assert.ok(b2.units.some((u) => u.id === 'kit' && u.team === 'player'));
+});
+
+/* ---------- 戰鬥指令擴充 ---------- */
+function mini2() {
+  const c = mini();
+  c.meta.rules = { morale: true, spirits: true };
+  Object.assign(c.weapons, {
+    heal: { name: '治療杖', type: 'staff', dmg: 'mag', heal: 10, range: [1, 1] },
+    brave: { name: '勇者劍', type: 'sword', mt: 5, hit: 100, crit: 0, range: [1, 1], brave: true },
+    finisher: { name: '必殺技', type: 'sword', mt: 20, hit: 100, crit: 0, range: [1, 1], morale: 120 },
+  });
+  c.units.h = { name: 'H', class: 'foot', stats: { hp: 15, mag: 5 }, weapons: ['heal'], items: ['vulnerary'] };
+  c.units.a.spirits = ['strike', 'alert', 'valor', 'iron_wall', 'accel', 'trust', 'effort'];
+  c.units.a.sp = 100;
+  return c;
+}
+
+test('杖：治療相鄰受傷同伴並獲得經驗；杖不能用來攻擊', () => {
+  const c = mini2();
+  const b = B.createBattle(c, 'c', { seed: 1 });
+  const a = b.units[0];
+  const h = B.addUnit(b, { unit: 'h', team: 'player', x: 1, y: 0 });
+  a.hp = 5;
+  assert.deepEqual(B.healTargets(b, h).map((u) => u.uid), [a.uid]);
+  const r = B.heal(b, h, a);
+  assert.equal(a.hp, 20); assert.equal(r.amount, 15);
+  assert.ok(r.exp[h.uid] > 0);
+  const e = b.units[1]; e.x = 2; e.y = 0; h.x = 1; h.y = 0;
+  assert.equal(B.targetsFrom(b, h).length, 0);
+  assert.equal(R.forecast(b, e, h).def, null);   // 拿杖不會反擊
+});
+
+test('道具：傷藥回復、次數用完會消失', () => {
+  const c = mini2();
+  const b = B.createBattle(c, 'c', { seed: 1 });
+  const h = B.addUnit(b, { unit: 'h', team: 'player', x: 1, y: 0 });
+  h.hp = 1;
+  B.useItem(b, h, 0); assert.equal(h.hp, 11); assert.equal(h.items[0].uses, 2);
+  h.items[0].uses = 1;
+  B.useItem(b, h, 0); assert.equal(h.items.length, 0);
+});
+
+test('交換：武器與道具可在相鄰同伴間移動', () => {
+  const c = mini2();
+  const b = B.createBattle(c, 'c', { seed: 1 });
+  const a = b.units[0];
+  const h = B.addUnit(b, { unit: 'h', team: 'player', x: 1, y: 0 });
+  assert.deepEqual(B.tradePartners(b, a).map((u) => u.uid), [h.uid]);
+  B.transfer(b, h, a, 'item', 0);
+  B.transfer(b, a, h, 'weapon', 0);
+  assert.equal(a.items[0].id, 'vulnerary');
+  assert.deepEqual(h.weapons, ['heal', 'sword']);
+});
+
+test('勇者武器每次攻擊兩下、氣力影響傷害與武器使用', () => {
+  const c = mini2();
+  const b = B.createBattle(c, 'c', { seed: 1 });
+  const [a, e] = b.units;
+  e.x = 1; e.y = 0;
+  a.weapons = ['brave', 'finisher'];
+  let fc = B.previewAttack(b, a, e);
+  assert.equal(fc.att.per, 2); assert.equal(fc.att.strikes, 4);
+  assert.deepEqual(B.weaponsFor(b, a, 1).map((x) => x.i), [0]);   // 氣力 100 < 120
+  a.morale = 120;
+  assert.equal(B.weaponsFor(b, a, 1).length, 2);
+  fc = B.previewAttack(b, a, e, 0);
+  assert.equal(fc.att.dmg, Math.floor(9 * 120 / 100));
+  const res = R.resolveCombat(b, a, e, U.makeRng(1));
+  assert.ok(res.strikes.filter((s) => s.by === a.uid).length >= 2);
+});
+
+test('精神指令：必中、熱血、鐵壁、閃避、加速、信賴、SP 消耗', () => {
+  const c = mini2();
+  const b = B.createBattle(c, 'c', { seed: 1 });
+  const [a, e] = b.units;
+  e.x = 1; e.y = 0;
+  const base = B.previewAttack(b, a, e).att;
+  B.useSpirit(b, a, 'strike'); B.useSpirit(b, a, 'valor');
+  const fc = B.previewAttack(b, a, e);
+  assert.equal(fc.att.hit, 100);
+  assert.equal(fc.att.dmg, base.dmg * 2);
+  assert.equal(a.sp, 100 - 15 - 30);
+  B.useSpirit(b, a, 'iron_wall');
+  assert.equal(B.previewAttack(b, e, a).att.dmg, Math.floor(7 / 4));
+  B.useSpirit(b, a, 'alert');
+  const r = R.resolveCombat(b, e, a, U.makeRng(3));
+  assert.equal(r.strikes[0].evaded, true);
+  assert.ok(!a.buffs.alert);
+  assert.ok(!a.buffs.valor);                         // 反擊後熱血消耗
+  const mv = R.reachable(b, a).size;
+  B.useSpirit(b, a, 'accel');
+  assert.ok(R.reachable(b, a).size > mv);
+  const h = B.addUnit(b, { unit: 'h', team: 'player', x: 0, y: 2 }); h.hp = 3;
+  assert.ok(B.spiritTargets(b, a, 'trust').includes(h));
+  a.sp = 25;
+  B.useSpirit(b, a, 'trust', h); assert.equal(h.hp, 15);
+  assert.equal(a.sp, 0);
+  assert.equal(B.useSpirit(b, a, 'valor').error, 'SP 不足');
+  // 回合型狀態在下一個我方回合開始時解除
+  B.wait(b, a); B.endPhase(b); B.endPhase(b);
+  assert.ok(!a.buffs.sureHit && !a.buffs.ironWall);
+});
+
+test('敵方 AI 會用杖治療、低血量會喝藥', () => {
+  const c = mini2();
+  const b = B.createBattle(c, 'c', { seed: 1 });
+  const e = b.units[1];
+  const h = B.addUnit(b, { unit: 'h', team: 'enemy', x: 4, y: 0 });
+  e.hp = 5;
+  const p = AI.plan(b, h);
+  assert.equal(p.heal, e.uid);
+  h.hp = 2; e.hp = e.stats.hp;
+  assert.equal(AI.plan(b, h).item, 0);
 });

@@ -20,6 +20,26 @@
     throne:   { name: '王座', char: 'K', color: '#c8a030', cost: { foot: 1, horse: 1, fly: 1, armor: 1 }, def: 3, avo: 30, heal: 10 },
   };
 
+  // 預設精神指令（SRW 風格），劇本可覆寫或新增
+  const BASE_SPIRITS = {
+    strike:   { name: '必中', cost: 15, effect: 'sureHit', target: 'self', desc: '本回合命中率 100%' },
+    alert:    { name: '閃避', cost: 15, effect: 'alert', target: 'self', desc: '下一次受到的攻擊必定迴避' },
+    valor:    { name: '熱血', cost: 30, effect: 'valor', target: 'self', desc: '下一場戰鬥傷害 2 倍' },
+    iron_wall:{ name: '鐵壁', cost: 20, effect: 'ironWall', target: 'self', desc: '本回合受到傷害 1/4' },
+    accel:    { name: '加速', cost: 5, effect: 'accel', value: 3, target: 'self', desc: '本次移動力 +3' },
+    focus:    { name: '集中', cost: 15, effect: 'focus', target: 'self', desc: '本回合命中、迴避 +30' },
+    effort:   { name: '努力', cost: 10, effect: 'effort', target: 'self', desc: '下一場戰鬥經驗值 2 倍' },
+    trust:    { name: '信賴', cost: 25, effect: 'heal', value: 15, target: 'ally', desc: '回復一名同伴 15 HP' },
+    guts:     { name: '氣合', cost: 20, effect: 'morale', value: 10, target: 'self', desc: '氣力 +10' },
+    cheer:    { name: '激勵', cost: 40, effect: 'morale', value: 5, target: 'allies', desc: '全體同伴氣力 +5' },
+  };
+
+  // 預設道具：kind = heal(回復 HP) / boost(永久能力) / sp(回復 SP) / morale(氣力)
+  const BASE_ITEMS = {
+    vulnerary: { name: '傷藥', kind: 'heal', power: 10, uses: 3, icon: 217, desc: '回復 10 HP' },
+    elixir:    { name: '萬靈藥', kind: 'heal', power: 99, uses: 1, icon: 225, desc: 'HP 全回復' },
+  };
+
   function normalize(raw) {
     const c = clone(raw || {});
     if (c.format && c.format !== 'srpg-campaign') throw new Error('不是 srpg-campaign 格式：' + c.format);
@@ -27,6 +47,8 @@
     c.version = c.version || 1;
     c.meta = Object.assign({ title: '未命名劇本', author: '', start: null, permadeath: true }, c.meta || {});
     c.terrains = Object.assign({}, clone(BASE_TERRAINS), c.terrains || {});
+    c.spirits = Object.assign({}, clone(BASE_SPIRITS), c.spirits || {});
+    c.items = Object.assign({}, clone(BASE_ITEMS), c.items || {});
     for (const k of ['weapons', 'classes', 'units', 'sprites', 'portraits', 'chapters', 'scripts']) c[k] = c[k] || {};
     if (!c.meta.start) c.meta.start = Object.keys(c.chapters)[0] || null;
     return c;
@@ -41,6 +63,8 @@
     for (const [id, u] of Object.entries(c.units)) {
       if (!c.classes[u.class]) errs.push(`角色 ${id} 的職業 ${u.class} 不存在`);
       for (const w of u.weapons || []) if (!c.weapons[w]) errs.push(`角色 ${id} 的武器 ${w} 不存在`);
+      for (const it of u.items || []) if (!c.items[it]) errs.push(`角色 ${id} 的道具 ${it} 不存在`);
+      for (const sp of u.spirits || []) if (!c.spirits[sp]) errs.push(`角色 ${id} 的精神指令 ${sp} 不存在`);
     }
     for (const [id, ch] of Object.entries(c.chapters)) {
       let grid;
@@ -54,6 +78,9 @@
         const cid = typeof n === 'string' ? n : n.chapter;
         if (cid && !c.chapters[cid]) errs.push(`章節 ${id}：下一章 ${cid} 不存在`);
       }
+    }
+    for (const [id, sp] of Object.entries(c.spirits)) {
+      if (!SRPG.rules || !SRPG.rules.EFFECTS[sp.effect]) errs.push(`精神指令 ${id} 的效果 ${sp.effect} 不存在`);
     }
     for (const [id, s] of Object.entries(c.scripts)) {
       if (!Array.isArray(s)) { errs.push(`劇本 ${id} 必須是陣列`); continue; }
@@ -102,6 +129,9 @@
     const stats = clone(saved ? saved.stats : def.stats) || {};
     for (const k of STAT_KEYS) stats[k] = stats[k] || 0;
     const level = saved ? saved.level : (place.level || def.level || 1);
+    const rules = Object.assign({ moraleStart: 100 }, (c.meta && c.meta.rules) || {});
+    const items = saved && saved.items ? clone(saved.items)
+      : (def.items || []).map((id) => ({ id, uses: (c.items[id] && c.items[id].uses) || 1 }));
     return {
       uid, id: place.unit, name: def.name || place.unit, team: place.team || 'enemy',
       cls: def.class, className: cls.name || def.class,
@@ -113,6 +143,9 @@
       move: cls.move || 5, moveType: cls.moveType || 'foot', tags: clone(cls.tags || []),
       sprite: def.sprite || cls.sprite || null, portrait: def.portrait || null,
       ai: place.ai || 'aggressive', boss: !!place.boss, lord: !!(def.lord || place.lord),
+      items, spirits: clone(def.spirits || cls.spirits || []),
+      sp: def.sp || 0, maxSp: def.sp || 0,
+      morale: def.morale || rules.moraleStart, buffs: {}, dir: place.team === 'enemy' ? 1 : 2,
       acted: false, moved: false,
     };
   }
@@ -140,6 +173,6 @@
     return neg ? !ok : ok;
   }
 
-  SRPG.campaign = { STAT_KEYS, STAT_NAMES, BASE_TERRAINS, normalize, validate, parseMap, defaultLegend, makeUnit, resolveNext, testCond };
+  SRPG.campaign = { STAT_KEYS, STAT_NAMES, BASE_TERRAINS, BASE_SPIRITS, BASE_ITEMS, normalize, validate, parseMap, defaultLegend, makeUnit, resolveNext, testCond };
   if (typeof module !== 'undefined' && module.exports) module.exports = SRPG;
 })(typeof window !== 'undefined' ? window : globalThis);
