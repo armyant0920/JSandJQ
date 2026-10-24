@@ -59,6 +59,7 @@
     });
     const v = ch.victory || {};
     if (v.type === 'seize') { ctx.strokeStyle = '#ffd24a'; ctx.setLineDash([6, 4]); ctx.lineWidth = 3; ctx.strokeRect(v.x * TS + 4, v.y * TS + 4, TS - 8, TS - 8); ctx.setLineDash([]); }
+    for (const p of ch.deploySlots || []) { ctx.strokeStyle = '#5a8cff'; ctx.lineWidth = 3; ctx.setLineDash([4, 4]); ctx.strokeRect(p.x * TS + 6, p.y * TS + 6, TS - 12, TS - 12); ctx.setLineDash([]); }
     for (const ev of ch.events || []) if (ev.on === 'visit') { ctx.fillStyle = '#ffd24a'; ctx.font = 'bold 14px sans-serif'; ctx.fillText('V', ev.x * TS + 36, ev.y * TS + 14); }
     return null;
   }
@@ -91,6 +92,13 @@
         }
         ED.dirty(true);
       } else if (tool.mode === 'seize') { ch.victory = { type: 'seize', x: t.x, y: t.y }; ED.dirty(true); }
+      else if (tool.mode === 'slot') {
+        ch.deploySlots = ch.deploySlots || [];
+        const i = ch.deploySlots.findIndex((p) => p.x === t.x && p.y === t.y);
+        if (i >= 0) ch.deploySlots.splice(i, 1); else ch.deploySlots.push({ x: t.x, y: t.y });
+        if (!ch.deploySlots.length) delete ch.deploySlots;
+        ED.dirty(true);
+      }
       else if (tool.mode === 'visit') {
         const sid = ED.newId('scripts', id + '_visit');
         ED.c.scripts[sid] = [{ cmd: 'say', name: '村民', text: '歡迎光臨！' }];
@@ -113,7 +121,7 @@
     const size = { w: W, h: H };
 
     const toolbar = h('div', {},
-      h('div.row', {}, modeBtn('paint', '🖌 地形'), modeBtn('unit', '🧍 單位'), modeBtn('seize', '🏁 壓制點'), modeBtn('visit', '🏠 拜訪點'),
+      h('div.row', {}, modeBtn('paint', '🖌 地形'), modeBtn('unit', '🧍 單位'), modeBtn('seize', '🏁 壓制點'), modeBtn('visit', '🏠 拜訪點'), modeBtn('slot', '🔷 出擊位置'),
         h('span.hint', {}, '右鍵：刪除單位'),
         h('span', { style: { flex: 1 } }),
         '縮放', h('input', { type: 'range', min: 0.3, max: 1.5, step: 0.05, value: tool.zoom, oninput: (e) => { tool.zoom = +e.target.value; cv.style.width = Math.round(cv.width * tool.zoom) + 'px'; } }),
@@ -126,10 +134,11 @@
       tool.mode === 'unit' ? h('div.row', {}, '單位', ED.select(tool, 'unit', ED.named('units')), '陣營', ED.select(tool, 'team', TEAMS), 'AI', ED.select(tool, 'ai', AIS),
         h('span.hint', {}, '點空格放置、點單位選取')) : null,
       tool.mode === 'seize' ? h('p.hint', {}, '點地圖設定壓制地點（勝利條件會改為「壓制」）') : null,
-      tool.mode === 'visit' ? h('p.hint', {}, '點地圖新增「拜訪」事件（會自動建立一段劇本）') : null);
+      tool.mode === 'visit' ? h('p.hint', {}, '點地圖新增「拜訪」事件（會自動建立一段劇本）') : null,
+      tool.mode === 'slot' ? h('p.hint', {}, '點地圖新增/移除額外出擊位置（藍色虛線框）。出擊準備畫面中，名冊裡的其他角色會放在這些位置。') : null);
 
     // 單位清單
-    const unitTable = h('table.tbl', {}, h('tr', {}, ...['#', '單位', '陣營', 'X', 'Y', 'AI', '★敵將', 'Lv', '出場條件', ''].map((t) => h('th', {}, t))),
+    const unitTable = h('table.tbl', {}, h('tr', {}, ...['#', '單位', '陣營', 'X', 'Y', 'AI', '★敵將/必出', 'Lv', '出場條件', ''].map((t) => h('th', {}, t))),
       ...ch.units.map((p, i) => h('tr', { style: { background: i === tool.selIdx ? '#2a3450' : '' }, onclick: () => { if (tool.selIdx !== i) { tool.selIdx = i; redraw(); } } },
         h('td', {}, i + 1),
         h('td', {}, ED.select(p, 'unit', ED.named('units'), { rerender: true })),
@@ -137,7 +146,7 @@
         h('td', {}, ED.num(p, 'x', { rerender: true, attrs: { style: 'width:48px' } })),
         h('td', {}, ED.num(p, 'y', { rerender: true, attrs: { style: 'width:48px' } })),
         h('td', {}, p.team === 'player' ? '—' : ED.select(p, 'ai', AIS)),
-        h('td', {}, p.team === 'player' ? '' : ED.check(p, 'boss')),
+        h('td', {}, p.team === 'player' ? ED.check(p, 'forced', '必出') : ED.check(p, 'boss')),
         h('td', {}, ED.num(p, 'level', { attrs: { style: 'width:48px', placeholder: '預設' } })),
         h('td', {}, ED.text(p, 'if', { optional: true, attrs: { style: 'width:90px', placeholder: '旗標', list: 'flagList' } })),
         h('td', {}, h('button.danger', { onclick: () => { ch.units.splice(i, 1); tool.selIdx = -1; ED.dirty(true); } }, '✕')))));
@@ -184,7 +193,15 @@
         ...ED.formRow('ID', ED.idField('chapters')),
         ...ED.formRow('名稱', ED.text(ch, 'name')),
         ...ED.formRow('勝利', ED.select(v, 'type', VICTORY, { rerender: true }), ...vParams),
-        ...ED.formRow('敗北', ED.select(d, 'type', DEFEAT, { rerender: true }), ...dParams)),
+        ...ED.formRow('敗北', ED.select(d, 'type', DEFEAT, { rerender: true }), ...dParams),
+        ...ED.formRow('霧戰', ED.check(ch, 'fog', '只看得到我方視野內的敵人')),
+        ...ED.formRow('出擊準備', ED.check(ch, 'prep', '戰前可選人、整備、購物'))),
+      ch.prep ? h('div', {}, h('h3', {}, '商店商品'), h('div.chips', {}, ...ED.keys('items').concat(ED.keys('weapons')).map((id) => {
+        const d = ED.c.items[id] || ED.c.weapons[id];
+        const on = (ch.shop || []).includes(id);
+        return h('span.chip', { className: 'chip' + (on ? ' on' : ''), onclick: () => { ch.shop = on ? ch.shop.filter((x) => x !== id) : (ch.shop || []).concat(id); if (!ch.shop.length) delete ch.shop; ED.dirty(true); } },
+          d.icon != null ? h('span', { style: SRPG.sprites.iconStyle(d.icon, 18) }) : null, d.name || id);
+      }))) : null,
       h('h2', {}, '事件'),
       ...evRows,
       h('button', { onclick: () => { ch.events.push({ on: 'start' }); ED.dirty(true); } }, '＋ 新增事件'),

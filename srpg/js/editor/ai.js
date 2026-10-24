@@ -6,13 +6,13 @@
   'use strict';
   const { h } = ED;
   const C = SRPG.campaign;
-  const GROUPS = ['meta', 'terrains', 'weapons', 'items', 'spirits', 'classes', 'units', 'sprites', 'portraits', 'chapters', 'scripts'];
+  const GROUPS = ['meta', 'terrains', 'weapons', 'items', 'skills', 'spirits', 'classes', 'units', 'supports', 'sprites', 'portraits', 'chapters', 'scripts'];
 
   const SCOPES = {
     sprites: { label: '🎨 精靈圖 / 頭像（像素畫）', groups: ['sprites', 'portraits'], ctx: ['classes'] },
     maps: { label: '🗺 地圖與章節', groups: ['chapters'], ctx: ['terrains', 'units', 'scripts'] },
     story: { label: '📜 劇情對話', groups: ['scripts', 'chapters'], ctx: ['units'] },
-    db: { label: '⚖ 角色 / 職業 / 武器 / 道具 / 精神指令', groups: ['units', 'classes', 'weapons', 'items', 'spirits'], ctx: ['sprites'] },
+    db: { label: '⚖ 角色 / 職業 / 武器 / 道具 / 精神指令', groups: ['units', 'classes', 'weapons', 'items', 'skills', 'spirits', 'supports'], ctx: ['sprites'] },
   };
   const TASKS = {
     sprites: '請新增一個 16×16 的單位精靈 `sprite_xxx`：（描述外觀，例如：戴兜帽、拿法杖的白魔道士）。衣服主色用隊伍色 T/t。',
@@ -46,7 +46,11 @@
 - \`items\` 道具：{ name, kind:heal|boost|sp|morale, power, stat?(boost 用), uses, icon?, desc }
 - \`spirits\` 精神指令：{ name, cost(SP), effect, value?, target:self|ally|allies, desc }；effect 可用：${Object.entries(SRPG.rules.EFFECTS).map(([k, e]) => k + '(' + e.name + ')').join('、')}
 - \`units\` 另有：items:[道具id]、sp、morale(初始氣力)、spirits:[精神指令id]；sprite 可用 "chara_0"~"chara_7" 等圖片精靈
-- \`meta.rules\`：{ morale:true(氣力系統), spirits:true(精神指令) }
+- \`meta.rules\`：{ morale:true(氣力系統), spirits:true(精神指令), resources:true(體力/法力), stRegen, mpRegen, restSt }
+- \`weapons\` 另有：cost(消耗量)、costType:"st"|"mp"(預設物理用體力、魔法與杖用法力)、map:{shape:"burst"|"line", size, friendly?}(地圖兵器)、price
+- \`skills\` 被動技能：{ name, effect, desc, ...參數 }；effect：${Object.entries(SRPG.rules.SKILL_EFFECTS).map(([k, e]) => k + '(' + e.name + (e.params.length ? ':' + e.params.join('/') : '') + ')').join('、')}；rate 可為數字或能力名（spd/skl/lck…）
+- \`classes\`/\`units\` 另有：skills:[技能id]、st、mp、vision(霧戰視野)
+- \`supports\` 支援：{ "id": { a:角色id, b:角色id, ranks:[{rank:"C"|"B"|"A", need:支援值, script:劇本id}] } }
 - \`sprites\` / \`portraits\` 像素圖（見下）
 - \`chapters\` 章節、\`scripts\` 劇本對話（見下）
 - id 只用英數與底線。引用其他資料時用 id。`);
@@ -69,7 +73,8 @@
   "victory": { "type":"rout|boss|survive|seize", "turns":5?, "x":?, "y":? },
   "defeat":  { "type":"lordDies|unitDies|turnLimit", "unit"?:id, "turns"?:n },
   "events": [ { "on":"start|turn|death|talk|visit|victory", "turn"?:n, "phase"?:"player|enemy", "unit"?:id, "a"?:id, "b"?:id, "x"?:n, "y"?:n, "if"?:"旗標", "script":"劇本id" } ],
-  "next": [ { "if":"旗標", "chapter":"chA" }, { "chapter":"chB" } ] }   // 由上往下第一個符合；空陣列=結局
+  "next": [ { "if":"旗標", "chapter":"chA" }, { "chapter":"chB" } ],  // 由上往下第一個符合；空陣列=結局
+  "fog": true?, "prep": true?, "shop": [武器或道具id]?, "deploySlots": [{"x":0,"y":0}]? }   // 霧戰、出擊準備、商店、額外出擊位置
 \`\`\`
 - 座標 x 向右、y 向下，從 0 開始；單位不能放在無法通行的地形（牆、水）上。
 - 地圖字元：${Object.entries(ED.c.terrains).map(([k, t]) => `\`${t.char}\`=${t.name}(${k})`).join('、')}
@@ -83,7 +88,8 @@
   {"cmd":"set","flag":"旗標"} 或 {"cmd":"set","flag":"好感","add":1},
   {"cmd":"if","flag":"旗標","goto":"標籤","else":"標籤"}  // 也可加 "gte":2 / "eq":值；flag 前加 ! 表示否定
   {"cmd":"spawn","units":[{"unit":"id","team":"enemy","x":0,"y":0}]},
-  {"cmd":"recruit","unit":"id"}, {"cmd":"give","unit":"id","weapon":"武器id"} 或 {"cmd":"give","unit":"id","item":"道具id"}, {"cmd":"end"} ]
+  {"cmd":"recruit","unit":"id"}, {"cmd":"give","unit":"id","weapon":"武器id"} 或 {"cmd":"give","unit":"id","item":"道具id"},
+  {"cmd":"gold","add":1000}, {"cmd":"learn","unit":"id","skill":"技能id"}, {"cmd":"end"} ]
 \`\`\`
 - 沒有角色的人物可用 {"cmd":"say","name":"村長","text":"..."}。
 - 每個 goto / 選項跳轉的標籤都必須存在於同一段劇本。`);

@@ -123,3 +123,26 @@ button { font-family: inherit; }
 #trade .tarrow { text-align: center; font-size: 22px; color: var(--accent); padding-top: 30px; }
 #trade .actions { display: flex; justify-content: flex-end; }
 #trade .hint { color: var(--mut); font-size: 12px; }
+
+/* 出擊準備 */
+#prepScreen { justify-content: flex-start; padding-top: 30px; }
+#prepScreen h2 { color: var(--accent); }
+#prepScreen .row { display: flex; gap: 8px; align-items: center; width: min(980px, 96vw); }
+#prepScreen .sp { flex: 1; }
+#prepScreen .pill { background: #1a2036; border: 1px solid var(--line); border-radius: 12px; padding: 4px 12px; }
+#prepScreen .pbody { width: min(980px, 96vw); text-align: left; max-height: 62vh; overflow: auto; }
+#prepScreen .hint { color: var(--mut); font-size: 12px; margin: 0 0 8px; }
+.pgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.pcard { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left; }
+.pcard small { color: var(--mut); }
+.pcols { display: grid; grid-template-columns: 160px 1fr 1.2fr; gap: 14px; align-items: start; }
+.plist { display: flex; flex-direction: column; gap: 4px; }
+.prow { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid #ffffff10; }
+.prow .sp { flex: 1; }
+.prow small { color: var(--mut); }
+@media (max-width: 720px) { .pcols { grid-template-columns: 1fr; } }
+.card .res { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; font-size: 11px; }
+.card .res .bar { height: 4px; background: #000a; border-radius: 2px; overflow: hidden; }
+.card .res .bar i { display: block; height: 100%; }
+.card .skills { display: flex; flex-wrap: wrap; gap: 3px; margin: 3px 0; }
+.card .skills span { background: #203a50; color: #9fd8ff; border-radius: 8px; padding: 0 6px; font-size: 11px; }

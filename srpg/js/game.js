@@ -19,7 +19,13 @@
     view: null,                   // 檢視中的敵方範圍
     dangerAll: false,
     cursor: { x: 0, y: 0 }, fx: [], anim: null, hidden: new Set(),
+    gold: 0, convoy: [], supports: {},  // 軍資金、輸送隊、支援關係（跨章節保存）
+    vis: null,                          // 霧戰：我方可見格
   };
+  // 霧戰中看不到的敵人不顯示、不能被選取
+  const visible = (u) => !G.vis || u.team === 'player' || u.team === 'ally' || G.vis.has(u.x + ',' + u.y);
+  const seenUnitAt = (x, y) => { const u = G.battle && R.unitAt(G.battle, x, y); return u && visible(u) ? u : null; };
+  const party = () => ({ roster: G.roster, convoy: G.convoy, get gold() { return G.gold; }, set gold(v) { G.gold = v; } });
   window.SRPG_GAME = G; // 方便除錯/測試
 
   /* ================= 劇本載入 ================= */
@@ -63,6 +69,7 @@
     const b = G.battle;
     if (!b) return;
     RD.drawMap(ctx, G.campaign, b.map, now);
+    G.vis = b.chapter.fog ? R.visibleTiles(b, 'player') : null;
     if (G.dangerAll && G.dangerTiles) RD.tint(ctx, G.dangerTiles, 'rgba(255,60,60,0.22)');
     if (G.view) { RD.tint(ctx, G.view.move, 'rgba(200,80,255,0.30)'); RD.tint(ctx, G.view.atk, 'rgba(255,60,60,0.30)'); }
     if (G.mode === 'move' && G.threat) {
@@ -70,15 +77,27 @@
       RD.tint(ctx, G.threat.atk, 'rgba(255,70,70,0.32)');
       RD.drawPath(ctx, G.path);
     }
-    if (G.mode === 'target' && G.targets) RD.tint(ctx, G.targets.map((u) => u.x + ',' + u.y), G.targetKind === 'attack' ? 'rgba(255,70,70,0.45)' : 'rgba(80,230,140,0.45)');
+    if (G.mode === 'target' && G.targets) RD.tint(ctx, G.targets.map((u) => u.x + ',' + u.y), G.targetKind === 'attack' ? 'rgba(255,70,70,0.45)' : G.targetKind === 'map' ? 'rgba(255,170,60,0.30)' : 'rgba(80,230,140,0.45)');
+    if (G.mode === 'target' && G.targetKind === 'map' && G.targets.some((p) => p.x === G.cursor.x && p.y === G.cursor.y)) {
+      const me = B.byUid(b, G.sel);
+      RD.tint(ctx, R.mapArea(b, me, G.mapW.w, G.cursor).map((p) => p.x + ',' + p.y), 'rgba(255,120,30,0.55)');
+    }
+    if (G.mode === 'canto' && G.reach) RD.tint(ctx, [...G.reach.values()].filter((n) => n.stop).map((n) => n.x + ',' + n.y), 'rgba(70,200,255,0.40)');
+    if (G.flash && now - G.flash.t0 < 500) RD.tint(ctx, G.flash.tiles.map((p) => p.x + ',' + p.y), `rgba(255,200,80,${0.6 * (1 - (now - G.flash.t0) / 500)})`);
     // 目標壓制點
     const v = b.chapter.victory || {};
     if (v.type === 'seize') { ctx.strokeStyle = '#ffd24a'; ctx.lineWidth = 3; ctx.strokeRect(v.x * TS + 3, v.y * TS + 3, TS - 6, TS - 6); }
-    const units = b.units.filter((u) => u.hp > 0 && !G.hidden.has(u.uid)).sort((a, c) => a.y - c.y);
+    const units = b.units.filter((u) => R.onMap(u) && !G.hidden.has(u.uid) && visible(u)).sort((a, c) => a.y - c.y);
     for (const u of units) {
       const p = unitPixel(u);
       const dir = G.anim && G.anim.uid === u.uid && G.anim.dir != null ? G.anim.dir : undefined;
-      RD.drawUnit(ctx, G.campaign, u, p.x, p.y, now, { gray: u.acted && u.team === b.phase, dir });
+      RD.drawUnit(ctx, G.campaign, u, p.x, p.y, now, { gray: u.acted && u.team === b.phase && !u.cantoMove, dir });
+      if (u.carrying) { ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; ctx.fillText('🫂', p.x + 1, p.y + TS - 6); }
+    }
+    // 霧
+    if (G.vis) {
+      ctx.fillStyle = 'rgba(10,14,30,0.55)';
+      for (let y = 0; y < b.map.h; y++) for (let x = 0; x < b.map.w; x++) if (!G.vis.has(x + ',' + y)) ctx.fillRect(x * TS, y * TS, TS, TS);
     }
     // 死亡淡出
     for (const d of G.fx.filter((f) => f.dying)) {
@@ -88,7 +107,7 @@
       RD.drawUnit(ctx, G.campaign, d.unit, d.unit.x * TS, d.unit.y * TS, now, { still: true, hp: false });
       ctx.globalAlpha = 1;
     }
-    if (['idle', 'move', 'target'].includes(G.mode)) RD.drawCursor(ctx, G.cursor.x, G.cursor.y, now, G.mode === 'target' ? (G.targetKind === 'attack' ? '#ff6464' : '#5ae07a') : '#fff');
+    if (['idle', 'move', 'target', 'canto'].includes(G.mode)) RD.drawCursor(ctx, G.cursor.x, G.cursor.y, now, G.mode === 'target' ? (G.targetKind === 'attack' ? '#ff6464' : '#5ae07a') : '#fff');
     RD.drawFx(ctx, G.fx.filter((f) => f.text), now);
     G.fx = G.fx.filter((f) => now - f.t0 < 1000 || !f.t0);
   }
@@ -102,14 +121,15 @@
     $('chapterName').textContent = b.chapter.name || b.chapterId;
     $('turnInfo').textContent = `第 ${b.turn} 回合 · ${B.PHASE_NAMES[b.phase]}`;
     $('turnInfo').className = 'pill team-' + b.phase;
-    $('objective').textContent = '勝利：' + B.objectiveText(b.chapter);
+    $('objective').textContent = '勝利：' + B.objectiveText(b.chapter) + (b.chapter.fog ? '　🌫 霧戰' : '');
+    $('goldInfo').hidden = false; $('goldInfo').textContent = '💰 ' + G.gold;
     const myTurn = b.phase === 'player' && b.status === 'playing' && G.mode === 'idle';
     $('btnEnd').disabled = !myTurn;
     $('btnDanger').classList.toggle('primary', G.dangerAll);
     G.dangerTiles = null;
     if (G.dangerAll) {
       const all = new Set();
-      for (const e of B.living(b, 'enemy')) { const t = R.threatTiles(b, e); for (const k of t.move) all.add(k); for (const k of t.atk) all.add(k); }
+      for (const e of B.living(b, 'enemy').filter(visible)) { const t = R.threatTiles(b, e); for (const k of t.move) all.add(k); for (const k of t.atk) all.add(k); }
       G.dangerTiles = all;
     }
     updateCards();
@@ -118,7 +138,7 @@
   function updateCards() {
     const b = G.battle;
     if (!b) return;
-    const u = R.unitAt(b, G.cursor.x, G.cursor.y);
+    const u = seenUnitAt(G.cursor.x, G.cursor.y);
     UI.unitCard(u || (G.sel && B.byUid(b, G.sel)), b);
     UI.terrainCard(R.terrainAt(b, G.cursor.x, G.cursor.y));
   }
@@ -167,6 +187,13 @@
         for (const u of added) { u.acted = b.phase !== u.team ? u.acted : true; fx(u.x, u.y, '增援', '#ff9a9a'); }
       },
       recruit: (id2) => { const u = b && B.recruit(b, id2); if (u) fx(u.x, u.y, '加入我方！', '#8fb4ff'); },
+      gold: (n) => { G.gold = Math.max(0, G.gold + n); UI.toast((n >= 0 ? '獲得 ' : '失去 ') + Math.abs(n) + ' 金'); updateHud(); },
+      learn: (uid, sk) => {
+        const u = b && B.learn(b, uid, sk);
+        const name = (G.campaign.skills[sk] || {}).name || sk;
+        if (u) fx(u.x, u.y, '學會 ' + name, '#9fd8ff');
+        else if (G.roster[uid]) { const r = G.roster[uid]; r.skills = [...new Set((r.skills || []).concat(sk))]; }
+      },
       give: (uid, wid) => {
         const def = G.campaign.weapons[wid] || G.campaign.items[wid] || {};
         const u = b && B.give(b, uid, wid);
@@ -203,8 +230,10 @@
     if (restoreBattle) {
       G.battle = B.restore(G.campaign, restoreBattle);
     } else {
-      G.chapterStart = { roster: U.clone(G.roster), flags: U.clone(G.flags) };
-      G.battle = B.createBattle(G.campaign, id, { roster: G.roster, flags: G.flags });
+      G.chapterStart = { roster: U.clone(G.roster), flags: U.clone(G.flags), gold: G.gold, convoy: U.clone(G.convoy), supports: U.clone(G.supports) };
+      let deploy = null;
+      if (G.campaign.chapters[id].prep) { G.mode = 'busy'; deploy = await SRPG.PrepUI.show({ campaign: G.campaign, chapterId: id, party: party(), flags: G.flags }); }
+      G.battle = B.createBattle(G.campaign, id, { roster: G.roster, flags: G.flags, supports: G.supports, deploy });
     }
     await SP.preload(G.campaign);
     G.battle.flags = G.flags;
@@ -263,13 +292,18 @@
     for (const u of order) {
       if (u.hp <= 0 || u.acted || b.status !== 'playing') continue;
       const plan = AI.plan(b, u);
-      G.cursor = { x: u.x, y: u.y };
+      if (visible(u)) G.cursor = { x: u.x, y: u.y };
+      for (const sid of AI.pickSpirits(b, u, plan)) {
+        const r = B.useSpirit(b, u, sid);
+        if (!r.error && visible(u)) { fx(u.x, u.y, G.campaign.spirits[sid].name, '#ff9ae8'); await UI.sleep(350); }
+      }
       if (plan.x !== u.x || plan.y !== u.y) {
         const path = B.moveUnit(b, u, plan.x, plan.y);
-        if (path) await animateMove(u, path);
+        if (path && (visible(u) || G.vis && path.some((p) => G.vis.has(p.x + ',' + p.y)))) await animateMove(u, path);
       }
       const t = plan.target && B.byUid(b, plan.target);
-      if (t && t.hp > 0) await doAttack(u, t);
+      if (plan.map) await doMapAttack(u, plan.map.weapon, plan.map.at);
+      else if (t && t.hp > 0) await doAttack(u, t);
       else if (plan.heal) await doHeal(u, B.byUid(b, plan.heal));
       else if (plan.item != null) await doItem(u, plan.item);
       else B.wait(b, u);
@@ -334,11 +368,55 @@
     updateHud();
   }
 
+  async function doMapAttack(u, wi, at) {
+    const b = G.battle;
+    const w = R.weaponDef(b, u.weapons[wi]);
+    const victims = R.mapVictims(b, u, w, R.mapArea(b, u, w, at));
+    const before = new Map(victims.map((v) => [v.uid, v.hp]));
+    const res = B.mapAttack(b, u, wi, at);
+    if (!res) return B.wait(b, u);
+    const finals = new Map(victims.map((v) => [v.uid, v.hp]));
+    for (const v of victims) v.hp = before.get(v.uid);
+    await UI.banner(w.name || '地圖兵器', u.name, '#ffb44a', 700);
+    G.flash = { tiles: res.area, t0: performance.now() };
+    await UI.sleep(400);
+    for (const st of res.strikes) {
+      const tg = B.byUid(b, st.target);
+      tg.hp = st.hpAfter;
+      if (st.evaded) fx(tg.x, tg.y, '閃避！', '#ff9ae8');
+      else if (!st.hit) fx(tg.x, tg.y, 'MISS', '#cfd6e0');
+      else fx(tg.x, tg.y, (st.crit ? '必殺！' : '') + '-' + st.dmg, st.crit ? '#ffd24a' : '#ff6464');
+      await UI.sleep(220);
+    }
+    for (const v of victims) v.hp = finals.get(v.uid);
+    for (const d of res.deaths) { G.fx.push({ dying: true, unit: d, t0: performance.now() }); fx(d.x, d.y, '擊破', '#ffffff'); }
+    if (res.deaths.length) await UI.sleep(500);
+    await showGains(res);
+    updateHud();
+  }
+
+  // 行動結束後：先跑事件劇本，再處理「再移動」，最後共通檢查
+  async function postAction(me) {
+    const b = G.battle;
+    await drainQueue();
+    if (me && me.cantoMove && me.hp > 0 && b.status === 'playing') {
+      G.sel = me.uid; G.targets = null; G.targetKind = null; G.threat = null;
+      G.reach = R.reachable(b, me, me.cantoMove);
+      G.mode = 'canto'; setCursor(me.x, me.y);
+      UI.toast(`再移動（剩 ${me.cantoMove}）：選擇位置，Esc 留在原地`);
+      updateHud();
+      return;
+    }
+    resetSelection();
+    await afterAction();
+  }
+
   async function chapterClear() {
     const b = G.battle;
     G.mode = 'busy';
     await UI.banner('勝利！', b.chapter.name, '#ffd24a', 1400);
     B.commitRoster(b, G.roster);
+    G.supports = U.clone(b.supports || {});
     const next = C.resolveNext(b.chapter, G.flags);
     G.battle = null;
     G.chapter = next;
@@ -353,7 +431,9 @@
       <div class="col"><button class="btn primary" id="btnRetry">重新挑戰本章</button><button class="btn" id="btnToTitle">回到標題</button></div>`;
     UI.screen('endScreen');
     $('btnRetry').onclick = () => {
-      G.roster = U.clone(G.chapterStart.roster); G.flags = U.clone(G.chapterStart.flags);
+      const cs = G.chapterStart;
+      G.roster = U.clone(cs.roster); G.flags = U.clone(cs.flags);
+      G.gold = cs.gold || 0; G.convoy = U.clone(cs.convoy || []); G.supports = U.clone(cs.supports || {});
       startChapter(G.chapter);
     };
     $('btnToTitle').onclick = showTitle;
@@ -375,7 +455,7 @@
     return Object.assign(SV.makeSave({
       campaignTitle: G.campaign.meta.title, chapter: G.chapter, roster: G.roster, flags: G.flags,
       battle: G.battle && G.battle.status === 'playing' ? G.battle : null, label,
-    }), { source: G.source, chapterStart: G.chapterStart });
+    }), { source: G.source, chapterStart: G.chapterStart, gold: G.gold, convoy: U.clone(G.convoy), supports: U.clone(G.battle ? G.battle.supports : G.supports) });
   }
 
   function slotLabel(s) {
@@ -414,7 +494,8 @@
       if (!confirm(`存檔屬於「${sv.campaign}」，目前劇本是「${G.campaign.meta.title}」。仍要讀取嗎？`)) return;
     }
     G.roster = U.clone(sv.roster || {}); G.flags = U.clone(sv.flags || {});
-    G.chapterStart = sv.chapterStart || { roster: U.clone(G.roster), flags: U.clone(G.flags) };
+    G.gold = sv.gold || 0; G.convoy = U.clone(sv.convoy || []); G.supports = U.clone(sv.supports || {});
+    G.chapterStart = sv.chapterStart || { roster: U.clone(G.roster), flags: U.clone(G.flags), gold: G.gold, convoy: U.clone(G.convoy), supports: U.clone(G.supports) };
     hideScreens();
     if (!sv.chapter) return showEnding();
     if (sv.battle) startChapter(sv.chapter, sv.battle);
@@ -442,7 +523,7 @@
   }
 
   /* ================= 標題 ================= */
-  function hideScreens() { for (const id of ['titleScreen', 'slotScreen', 'endScreen']) UI.screen(id, false); }
+  function hideScreens() { for (const id of ['titleScreen', 'slotScreen', 'endScreen', 'prepScreen']) UI.screen(id, false); }
 
   function showTitle() {
     G.battle = null; G.mode = 'title';
@@ -457,7 +538,7 @@
     } else loadCampaignBySource(e.target.value);
   };
   $('btnNew').onclick = () => {
-    G.roster = {}; G.flags = {};
+    G.roster = {}; G.flags = {}; G.gold = 0; G.convoy = []; G.supports = {};
     if (!G.campaign.meta.start) { UI.toast('劇本沒有任何章節'); return; }
     startChapter(G.campaign.meta.start);
   };
@@ -497,7 +578,19 @@
   async function select(x, y) {
     const b = G.battle;
     if (!b || b.phase !== 'player' || b.status !== 'playing') return;
-    const u = R.unitAt(b, x, y);
+    const u = seenUnitAt(x, y);
+    if (G.mode === 'canto') {
+      const me = B.byUid(b, G.sel);
+      const n = G.reach.get(x + ',' + y);
+      if (!n || !n.stop) return;
+      G.mode = 'busy';
+      const path = B.cantoMove(b, me, x, y);
+      await animateMove(me, path);
+      resetSelection();
+      await afterAction();
+      updateHud();
+      return;
+    }
     if (G.mode === 'idle') {
       if (u && u.team === 'player' && !u.acted) {
         G.view = null; G.sel = u.uid;
@@ -532,6 +625,7 @@
         if (!r.ok) { G.mode = 'target'; return; }
         G.targets = null;
         await doAttack(me, t, r.weapon);
+        if (me.hp <= 0) { resetSelection(); await afterAction(); return; }
       } else if (G.targetKind === 'heal') {
         G.targets = null;
         await doHeal(me, t);
@@ -539,9 +633,27 @@
         const cb = G.targetCb; G.targets = null;
         cb(t);
         return;
+      } else if (G.targetKind === 'rescue') {
+        G.targets = null;
+        B.rescue(b, me, t);
+        fx(me.x, me.y, '救出 ' + t.name, '#8fb4ff');
+        await UI.sleep(300);
+      } else if (G.targetKind === 'drop') {
+        G.targets = null;
+        const c = B.drop(b, me, t.x, t.y);
+        if (c) fx(c.x, c.y, '放下', '#8fb4ff');
+        await UI.sleep(300);
+      } else if (G.targetKind === 'map') {
+        const area = R.mapArea(b, me, G.mapW.w, t);
+        const vs = R.mapVictims(b, me, G.mapW.w, area).filter(visible);
+        const foes = vs.filter((v) => !R.friendly(v.team, me.team)).length, allies = vs.length - foes;
+        const pos = screenPosOfTile(t.x, t.y);
+        const go = await UI.menu([{ id: 'go', name: `發動 ${G.mapW.w.name}`, note: `敵 ${foes}${allies ? ' / 友 ' + allies : ''}` }, { id: 'no', name: '取消' }], pos.x, pos.y);
+        if (go !== 'go') { G.mode = 'target'; return; }
+        G.targets = null;
+        await doMapAttack(me, G.mapW.i, t);
       }
-      resetSelection();
-      await afterAction();
+      await postAction(me);
     }
     updateHud();
   }
@@ -567,7 +679,39 @@
       UI.toast(msg);
     };
     switch (act.id) {
-      case 'attack': return pickTarget('attack', B.targetsFrom(b, me), '選擇攻擊目標（Esc 取消）');
+      case 'attack': {
+        const ts = B.targetsFrom(b, me).filter(visible);
+        if (!ts.length) { UI.toast('看不到可攻擊的目標'); return actionMenu(me); }
+        return pickTarget('attack', ts, '選擇攻擊目標（Esc 取消）');
+      }
+      case 'mapAttack': {
+        const ws = R.mapWeapons(b, me);
+        let pickW = ws[0];
+        if (ws.length > 1) {
+          const wi = await menuAt(ws.map(({ i, w }) => ({ id: i, name: w.name || w.id, icon: w.icon })));
+          if (wi == null) return actionMenu(me);
+          pickW = ws.find((x) => x.i === wi);
+        }
+        G.mapW = pickW;
+        const shape = pickW.w.map.shape === 'line' ? '選擇方向' : '選擇中心點';
+        return pickTarget('map', R.mapCenters(b, me, pickW.w), `${pickW.w.name}：${shape}（橘色為影響範圍，Esc 取消）`);
+      }
+      case 'rescue': return pickTarget('rescue', B.rescueTargets(b, me), '選擇要救出的同伴（Esc 取消）');
+      case 'drop': return pickTarget('drop', B.dropTiles(b, me), '選擇放下的位置（Esc 取消）');
+      case 'support': {
+        const ps = B.supportTargets(b, me);
+        let other = ps[0];
+        if (ps.length > 1) {
+          const id = await menuAt(ps.map((o) => ({ id: o.uid, name: o.name, note: (B.nextSupportRank(b, me, o) || {}).rank })));
+          if (id == null) return actionMenu(me);
+          other = B.byUid(b, id);
+        }
+        G.mode = 'busy';
+        const nr = B.supportTalk(b, me, other);
+        await drainQueue();
+        if (nr) await UI.banner(`支援 ${nr.rank}`, `${me.name} ＆ ${other.name}`, '#ffb3f0', 1000);
+        return postAction(me);
+      }
       case 'staff': return pickTarget('heal', B.healTargets(b, me), '選擇治療對象（Esc 取消）');
       case 'spirit': {
         const list = B.spiritsUsable(b, me).map((s) => ({ id: s.id, name: s.name, note: 'SP ' + (s.cost || 0), title: s.desc || '', disabled: (s.cost || 0) > me.sp }));
@@ -597,7 +741,7 @@
         if (idx == null) return actionMenu(me);
         G.mode = 'busy';
         await doItem(me, idx);
-        break;
+        return postAction(me);
       }
       case 'trade': {
         const ps = B.tradePartners(b, me);
@@ -620,9 +764,9 @@
         }
         G.mode = 'busy';
         B.talk(b, me, other);
-        break;
+        return postAction(me);
       }
-      case 'visit': G.mode = 'busy'; B.visit(b, me); break;
+      case 'visit': G.mode = 'busy'; B.visit(b, me); return postAction(me);
       case 'seize': G.mode = 'busy'; B.seize(b, me); break;
       default: B.wait(b, me);
     }
@@ -631,7 +775,8 @@
   }
 
   async function cancel() {
-    if (G.mode === 'move') { resetSelection(); G.mode = 'idle'; }
+    if (G.mode === 'canto') { B.endCanto(B.byUid(G.battle, G.sel)); resetSelection(); G.mode = 'busy'; await afterAction(); }
+    else if (G.mode === 'move') { resetSelection(); G.mode = 'idle'; }
     else if (G.mode === 'target') { G.targets = null; G.targetKind = null; await actionMenu(B.byUid(G.battle, G.sel)); }
     else if (G.mode === 'idle') G.view = null;
     updateHud();
@@ -655,13 +800,13 @@
   }
 
   canvas.addEventListener('click', (e) => {
-    if (UI.busy() || !['idle', 'move', 'target'].includes(G.mode)) return;
+    if (UI.busy() || !['idle', 'move', 'target', 'canto'].includes(G.mode)) return;
     const t = tileFromEvent(e);
     setCursor(t.x, t.y);
     select(t.x, t.y);
   });
   canvas.addEventListener('mousemove', (e) => {
-    if (!G.battle || !['idle', 'move', 'target'].includes(G.mode)) return;
+    if (!G.battle || !['idle', 'move', 'target', 'canto'].includes(G.mode)) return;
     const t = tileFromEvent(e);
     if (t.x !== G.cursor.x || t.y !== G.cursor.y) setCursor(t.x, t.y);
   });
@@ -671,7 +816,7 @@
     if (UI.onKey(e)) { e.preventDefault(); return; }
     if (!G.battle) return;
     const d = { ArrowUp: [0, -1], ArrowDown: [0, 1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] }[e.key];
-    if (['idle', 'move', 'target'].includes(G.mode)) {
+    if (['idle', 'move', 'target', 'canto'].includes(G.mode)) {
       if (d) {
         e.preventDefault();
         if (G.mode === 'target') { // 目標間切換

@@ -155,10 +155,13 @@
     const wl = u.weapons.map((id, i) => {
       const w = b.campaign.weapons[id] || {};
       const usable = R.isStaff(w) || R.canAttackWith(b, u, Object.assign({ id }, w));
-      return `<div class="${i === u.equip ? 'eq' : ''}${usable ? '' : ' dim'}">${icon(w.icon)} ${esc(w.name || id)} <small>${R.isStaff(w) ? '回復' + (w.heal || 10) : '威' + (w.mt || 0) + ' 命' + (w.hit || 0)} 射${(w.range || [1, 1]).join('-')}${w.brave ? ' 勇' : ''}${w.morale ? ' 氣' + w.morale : ''}</small></div>`;
+      return `<div class="${i === u.equip ? 'eq' : ''}${usable ? '' : ' dim'}">${icon(w.icon)} ${esc(w.name || id)} <small>${R.isStaff(w) ? '回復' + (w.heal || 10) : '威' + (w.mt || 0) + ' 命' + (w.hit || 0)} 射${(w.range || [1, 1]).join('-')}${w.brave ? ' 勇' : ''}${w.morale ? ' 氣' + w.morale : ''}${w.map ? ' 地圖' : ''}${w.cost && rules.resources ? ' ' + (R.weaponCost(w).type === 'mp' ? 'MP' : '體') + w.cost : ''}</small></div>`;
     }).join('');
     const il = (u.items || []).map((it) => { const d = b.campaign.items[it.id] || {}; return `<div>${icon(d.icon)} ${esc(d.name || it.id)} <small>×${it.uses}</small></div>`; }).join('');
     const bf = Object.keys(u.buffs || {}).map((k) => (R.EFFECTS[k] || {}).name || k);
+    const sk = R.skillsOf(b, u);
+    const bar = (label, v, m, col) => `<div>${label} ${v}/${m}<div class="bar"><i style="width:${m ? v / m * 100 : 0}%;background:${col}"></i></div></div>`;
+    const res = rules.resources && (u.maxSt || u.maxMp) ? `<div class="res">${u.maxSt ? bar('體力', u.st, u.maxSt, '#ffb44a') : '<div></div>'}${u.maxMp ? bar('法力', u.mp, u.maxMp, '#6aa8ff') : ''}</div>` : '';
     el.hidden = false;
     el.innerHTML = `<h3 class="team-${u.team}">${esc(u.name)}${u.boss ? ' ★' : ''}</h3>
       <div class="row"><span>${esc(u.className)} Lv${u.level}</span><span>EXP ${u.exp}</span></div>
@@ -166,6 +169,8 @@
       <div class="hpbar"><i style="width:${ratio}%"></i></div>
       ${rules.morale || rules.spirits ? `<div class="row">${rules.morale ? `<span>氣力 ${u.morale}</span>` : ''}${rules.spirits && u.maxSp ? `<span>SP ${u.sp}/${u.maxSp}</span>` : ''}</div>` : ''}
       ${bf.length ? `<div class="buffs">${bf.map((x) => `<span>${esc(x)}</span>`).join('')}</div>` : ''}
+      ${res}${sk.length ? `<div class="skills">${sk.map((x) => `<span title="${esc(x.desc || '')}">${esc(x.name)}</span>`).join('')}</div>` : ''}
+      ${u.carrying ? `<div>🫂 搬運中：${esc((b.units.find((o) => o.uid === u.carrying) || {}).name || '')}（技巧/速度減半）</div>` : ''}
       <div class="inv">${wl}${il}</div>
       ${statsHtml(u)}`;
   };
@@ -189,7 +194,9 @@
       const fc = opts.compute(cur);
       const a = side(fc.att), d = side(fc.def);
       const many = opts.weapons.length > 1;
-      const tags = a.tags.concat(d.tags.map((x) => x.replace('對方', '敵:')));
+      const costTag = (sd, who) => (sd && sd.cost && SRPG.rules.rulesOf({ campaign: opts.campaign }).resources ? [`${who}消耗${sd.cost.type === 'mp' ? 'MP' : '體力'} ${sd.cost.n}`] : []);
+      const procTag = (sd) => (sd && sd.procs ? sd.procs.map((p) => `${p.name} ${p.rate}%`) : []);
+      const tags = a.tags.concat(procTag(fc.att), costTag(fc.att, ''), d.tags.map((x) => x.replace('對方', '敵:')), costTag(fc.def, '敵'));
       el.innerHTML = `<table>
         <tr><th></th><th class="team-${att.team}">${esc(att.name)}</th><th class="team-${def.team}">${esc(def.name)}</th></tr>
         <tr><th>武器</th><td>${many ? '<button class="btn sm" data-w="-1">◀</button> ' : ''}${a.wpn}${arrow(a.tri)}${many ? ' <button class="btn sm" data-w="1">▶</button>' : ''}</td><td>${d.wpn}${arrow(d.tri)}</td></tr>

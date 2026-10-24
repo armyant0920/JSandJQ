@@ -10,9 +10,10 @@ window.SRPG_DEFAULT_CAMPAIGN = {
   "permadeath": true,
   "rules": {
    "morale": true,
-   "spirits": true
+   "spirits": true,
+   "resources": true
   },
-  "desc": "內建示範：3 章、劇情分歧、說服、拜訪村莊、增援；杖、道具、交換、精神指令、氣力。"
+  "desc": "內建示範：3 章、劇情分歧、說服、拜訪、增援；杖、道具、交換、救出、再移動、被動技能、體力/法力、地圖兵器、支援對話、出擊準備與商店、霧戰、精神指令、氣力。"
  },
  "weapons": {
   "iron_sword": {
@@ -26,7 +27,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     1,
     1
    ],
-   "icon": 296
+   "icon": 296,
+   "price": 400
   },
   "slim_sword": {
    "name": "細劍",
@@ -39,7 +41,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     1,
     1
    ],
-   "icon": 287
+   "icon": 287,
+   "price": 500
   },
   "killing_edge": {
    "name": "殺劍",
@@ -52,7 +55,9 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     1,
     1
    ],
-   "icon": 294
+   "icon": 294,
+   "cost": 2,
+   "price": 1800
   },
   "brave_sword": {
    "name": "勇者之劍",
@@ -66,7 +71,9 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     1
    ],
    "brave": true,
-   "icon": 298
+   "icon": 298,
+   "cost": 3,
+   "price": 3000
   },
   "meteor": {
    "name": "流星斬",
@@ -81,7 +88,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    ],
    "morale": 115,
    "icon": 299,
-   "desc": "氣力 115 以上才能使用的必殺技"
+   "desc": "氣力 115 以上才能使用的必殺技",
+   "cost": 6
   },
   "iron_lance": {
    "name": "鐵槍",
@@ -94,7 +102,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     1,
     1
    ],
-   "icon": 270
+   "icon": 270,
+   "price": 450
   },
   "javelin": {
    "name": "標槍",
@@ -107,7 +116,9 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     1,
     2
    ],
-   "icon": 271
+   "icon": 271,
+   "cost": 1,
+   "price": 600
   },
   "iron_axe": {
    "name": "鐵斧",
@@ -120,7 +131,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     1,
     1
    ],
-   "icon": 290
+   "icon": 290,
+   "price": 400
   },
   "hand_axe": {
    "name": "手斧",
@@ -133,7 +145,9 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     1,
     2
    ],
-   "icon": 285
+   "icon": 285,
+   "cost": 1,
+   "price": 600
   },
   "iron_bow": {
    "name": "鐵弓",
@@ -149,7 +163,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "effective": [
     "fly"
    ],
-   "icon": 57
+   "icon": 57,
+   "price": 500
   },
   "fire": {
    "name": "火焰",
@@ -162,7 +177,9 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     1,
     2
    ],
-   "icon": 263
+   "icon": 263,
+   "cost": 2,
+   "price": 500
   },
   "thunder": {
    "name": "雷擊",
@@ -175,7 +192,9 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     1,
     2
    ],
-   "icon": 256
+   "icon": 256,
+   "cost": 4,
+   "price": 900
   },
   "heal_staff": {
    "name": "治療杖",
@@ -186,7 +205,48 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     1,
     1
    ],
-   "icon": 278
+   "icon": 278,
+   "cost": 3,
+   "price": 600
+  },
+  "firestorm": {
+   "name": "火焰風暴",
+   "type": "anima",
+   "dmg": "mag",
+   "mt": 6,
+   "hit": 80,
+   "crit": 0,
+   "range": [
+    1,
+    3
+   ],
+   "map": {
+    "shape": "burst",
+    "size": 1
+   },
+   "cost": 8,
+   "morale": 110,
+   "icon": 268,
+   "desc": "地圖兵器：範圍 1 的爆炸，需要氣力 110"
+  },
+  "quake_lance": {
+   "name": "震地槍",
+   "type": "lance",
+   "dmg": "phys",
+   "mt": 9,
+   "hit": 85,
+   "crit": 0,
+   "range": [
+    1,
+    1
+   ],
+   "map": {
+    "shape": "line",
+    "size": 3
+   },
+   "cost": 8,
+   "icon": 274,
+   "desc": "地圖兵器：直線 3 格"
   },
   "physic": {
    "name": "遠距治療杖",
@@ -197,10 +257,30 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     1,
     3
    ],
-   "icon": 281
+   "icon": 281,
+   "cost": 5,
+   "price": 1500
   }
  },
  "items": {
+  "ether": {
+   "name": "魔力水",
+   "kind": "mp",
+   "power": 10,
+   "uses": 2,
+   "icon": 218,
+   "price": 500,
+   "desc": "回復 10 MP"
+  },
+  "tonic": {
+   "name": "提神藥",
+   "kind": "st",
+   "power": 10,
+   "uses": 2,
+   "icon": 219,
+   "price": 400,
+   "desc": "回復 10 體力"
+  },
   "vulnerary": {
    "name": "傷藥",
    "kind": "heal",
@@ -253,6 +333,9 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "sprite": "cavalier",
    "tags": [
     "horse"
+   ],
+   "skills": [
+    "canto"
    ]
   },
   "archer": {
@@ -292,7 +375,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "name": "盜賊",
    "move": 6,
    "moveType": "foot",
-   "sprite": "swordsman"
+   "sprite": "swordsman",
+   "vision": 5
   },
   "pegasus": {
    "name": "天馬騎士",
@@ -301,7 +385,11 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "sprite": "pegasus",
    "tags": [
     "fly"
-   ]
+   ],
+   "skills": [
+    "canto"
+   ],
+   "vision": 4
   },
   "soldier": {
    "name": "士兵",
@@ -355,7 +443,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "strike",
     "valor",
     "guts"
-   ]
+   ],
+   "st": 20
   },
   "mira": {
    "name": "米菈",
@@ -394,7 +483,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "accel",
     "iron_wall",
     "strike"
-   ]
+   ],
+   "st": 18
   },
   "rook": {
    "name": "魯克",
@@ -429,6 +519,10 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "focus",
     "strike",
     "effort"
+   ],
+   "st": 15,
+   "skills": [
+    "keen"
    ]
   },
   "elle": {
@@ -446,7 +540,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "res": 6
    },
    "weapons": [
-    "fire"
+    "fire",
+    "firestorm"
    ],
    "growth": {
     "hp": 55,
@@ -467,7 +562,9 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "valor",
     "alert",
     "effort"
-   ]
+   ],
+   "mp": 24,
+   "st": 8
   },
   "lina": {
    "name": "莉娜",
@@ -506,7 +603,9 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "trust",
     "cheer",
     "alert"
-   ]
+   ],
+   "mp": 30,
+   "st": 8
   },
   "kit": {
    "name": "基特",
@@ -544,6 +643,10 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "alert",
     "accel",
     "focus"
+   ],
+   "st": 20,
+   "skills": [
+    "adept"
    ]
   },
   "sera": {
@@ -580,7 +683,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "accel",
     "alert",
     "strike"
-   ]
+   ],
+   "st": 18
   },
   "bandit": {
    "name": "山賊",
@@ -616,7 +720,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    },
    "weapons": [
     "hand_axe"
-   ]
+   ],
+   "st": 10
   },
   "garr": {
    "name": "加爾",
@@ -638,7 +743,15 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    ],
    "items": [
     "vulnerary"
-   ]
+   ],
+   "st": 15,
+   "skills": [
+    "vantage"
+   ],
+   "spirits": [
+    "valor"
+   ],
+   "sp": 30
   },
   "soldier": {
    "name": "帝國兵",
@@ -656,7 +769,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    },
    "weapons": [
     "iron_lance"
-   ]
+   ],
+   "st": 6
   },
   "imp_archer": {
    "name": "帝國弓兵",
@@ -710,7 +824,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    },
    "weapons": [
     "fire"
-   ]
+   ],
+   "mp": 12
   },
   "imp_cleric": {
    "name": "帝國僧侶",
@@ -728,7 +843,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    },
    "weapons": [
     "heal_staff"
-   ]
+   ],
+   "mp": 15
   },
   "voss": {
    "name": "沃斯將軍",
@@ -746,12 +862,25 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    },
    "weapons": [
     "iron_lance",
-    "javelin"
+    "javelin",
+    "quake_lance"
    ],
    "items": [
     "elixir"
    ],
-   "sprite": "chara_2"
+   "sprite": "chara_2",
+   "st": 30,
+   "skills": [
+    "luna",
+    "guard"
+   ],
+   "spirits": [
+    "iron_wall",
+    "valor",
+    "strike"
+   ],
+   "sp": 60,
+   "morale": 105
   }
  },
  "sprites": {
@@ -1260,6 +1389,22 @@ window.SRPG_DEFAULT_CAMPAIGN = {
   },
   "ch2a": {
    "name": "第二章 迷霧森林",
+   "fog": true,
+   "prep": true,
+   "shop": [
+    "vulnerary",
+    "elixir",
+    "ether",
+    "tonic",
+    "iron_sword",
+    "slim_sword",
+    "iron_lance",
+    "javelin",
+    "fire",
+    "thunder",
+    "heal_staff",
+    "physic"
+   ],
    "map": {
     "rows": [
      "FFFF..FFFFF..FFF",
@@ -1385,6 +1530,21 @@ window.SRPG_DEFAULT_CAMPAIGN = {
   },
   "ch2b": {
    "name": "第二章 王道關所",
+   "prep": true,
+   "shop": [
+    "vulnerary",
+    "elixir",
+    "ether",
+    "tonic",
+    "iron_sword",
+    "slim_sword",
+    "iron_lance",
+    "javelin",
+    "fire",
+    "thunder",
+    "heal_staff",
+    "physic"
+   ],
    "map": {
     "rows": [
      "####..######..##",
@@ -1513,6 +1673,33 @@ window.SRPG_DEFAULT_CAMPAIGN = {
   },
   "ch3": {
    "name": "終章 晨星之誓",
+   "prep": true,
+   "shop": [
+    "vulnerary",
+    "elixir",
+    "ether",
+    "tonic",
+    "iron_sword",
+    "slim_sword",
+    "iron_lance",
+    "javelin",
+    "fire",
+    "thunder",
+    "heal_staff",
+    "physic",
+    "killing_edge",
+    "brave_sword"
+   ],
+   "deploySlots": [
+    {
+     "x": 2,
+     "y": 3
+    },
+    {
+     "x": 2,
+     "y": 5
+    }
+   ],
    "map": {
     "rows": [
      "MMM..FF....FFMMM",
@@ -1642,7 +1829,149 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "next": []
   }
  },
+ "supports": {
+  "alan_mira": {
+   "a": "alan",
+   "b": "mira",
+   "ranks": [
+    {
+     "rank": "C",
+     "need": 2,
+     "script": "sup_alan_mira_c"
+    },
+    {
+     "rank": "B",
+     "need": 5,
+     "script": "sup_alan_mira_b"
+    },
+    {
+     "rank": "A",
+     "need": 9,
+     "script": "sup_alan_mira_a"
+    }
+   ]
+  },
+  "elle_lina": {
+   "a": "elle",
+   "b": "lina",
+   "ranks": [
+    {
+     "rank": "C",
+     "need": 2,
+     "script": "sup_elle_lina_c"
+    },
+    {
+     "rank": "B",
+     "need": 5,
+     "script": "sup_elle_lina_b"
+    }
+   ]
+  },
+  "rook_kit": {
+   "a": "rook",
+   "b": "kit",
+   "ranks": [
+    {
+     "rank": "C",
+     "need": 3,
+     "script": "sup_rook_kit_c"
+    }
+   ]
+  }
+ },
  "scripts": {
+  "sup_alan_mira_c": [
+   {
+    "cmd": "say",
+    "who": "mira",
+    "text": "艾倫大人，您又一個人衝在最前面了。"
+   },
+   {
+    "cmd": "say",
+    "who": "alan",
+    "side": "right",
+    "text": "抱歉……但我不想讓任何人因為我而受傷。"
+   },
+   {
+    "cmd": "say",
+    "who": "mira",
+    "text": "那就讓我跟在您身邊吧。騎士的職責就是守護主君。"
+   }
+  ],
+  "sup_alan_mira_b": [
+   {
+    "cmd": "say",
+    "who": "alan",
+    "side": "right",
+    "text": "米菈，妳為什麼會成為騎士？"
+   },
+   {
+    "cmd": "say",
+    "who": "mira",
+    "text": "……小時候，是您的父親救了我的村子。那天我就決定了。"
+   }
+  ],
+  "sup_alan_mira_a": [
+   {
+    "cmd": "say",
+    "who": "mira",
+    "text": "不管前方是什麼，我都會和您一起走下去。"
+   },
+   {
+    "cmd": "say",
+    "who": "alan",
+    "side": "right",
+    "text": "謝謝妳，米菈。有妳在，我就不會迷失。"
+   },
+   {
+    "cmd": "learn",
+    "unit": "alan",
+    "skill": "sol"
+   },
+   {
+    "cmd": "narrate",
+    "text": "艾倫學會了技能「太陽」！"
+   }
+  ],
+  "sup_elle_lina_c": [
+   {
+    "cmd": "say",
+    "who": "elle",
+    "text": "莉娜，妳的治療杖好厲害！可以教我嗎？"
+   },
+   {
+    "cmd": "say",
+    "who": "lina",
+    "side": "right",
+    "text": "呵呵，那妳先把火焰魔法的法力省一點用吧。"
+   }
+  ],
+  "sup_elle_lina_b": [
+   {
+    "cmd": "say",
+    "who": "lina",
+    "side": "right",
+    "text": "艾兒，妳最近法力控制得很好呢。"
+   },
+   {
+    "cmd": "say",
+    "who": "elle",
+    "text": "嘿嘿，因為我想跟莉娜一樣保護大家！"
+   }
+  ],
+  "sup_rook_kit_c": [
+   {
+    "cmd": "say",
+    "who": "rook",
+    "text": "……你剛剛是不是偷了我的箭？"
+   },
+   {
+    "cmd": "say",
+    "who": "kit",
+    "side": "right",
+    "text": "借、借一下而已嘛！"
+   }
+  ],
   "ch1_intro": [
    {
     "cmd": "narrate",
@@ -1677,6 +2006,10 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    {
     "cmd": "narrate",
     "text": "【提示】點選我方單位→點藍色格移動→選擇行動：攻擊／杖／精神／道具／交換／待機。村莊(V)可以拜訪；艾倫可以和盜賊基特「交談」。"
+   },
+   {
+    "cmd": "gold",
+    "add": 1500
    },
    {
     "cmd": "narrate",
@@ -1817,6 +2150,14 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "cmd": "say",
     "who": "garr",
     "text": "可、可惡……我加爾竟然……"
+   },
+   {
+    "cmd": "gold",
+    "add": 2000
+   },
+   {
+    "cmd": "narrate",
+    "text": "獲得山賊的藏寶 2000 金。"
    }
   ],
   "ch1_end": [
@@ -1862,7 +2203,7 @@ window.SRPG_DEFAULT_CAMPAIGN = {
   "ch2a_intro": [
    {
     "cmd": "narrate",
-    "text": "迷霧森林。濃霧中傳來帝國兵的腳步聲……"
+    "text": "迷霧森林。濃霧中傳來帝國兵的腳步聲……（霧戰：只看得到我方附近的敵人，盜賊與天馬騎士視野較廣）"
    },
    {
     "cmd": "say",
@@ -1971,6 +2312,10 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    }
   ],
   "ch3_intro": [
+   {
+    "cmd": "narrate",
+    "text": "【提示】沃斯將軍持有地圖兵器「震地槍」（直線 3 格），不要排成一直線！體力不足時「待機」可以喘口氣。"
+   },
    {
     "cmd": "say",
     "who": "voss",

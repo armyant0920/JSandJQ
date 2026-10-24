@@ -117,6 +117,7 @@
         eachChapter((ch) => {
           (ch.units || []).forEach((p) => swap(p, 'unit'));
           (ch.events || []).forEach((ev) => { swap(ev, 'unit'); swap(ev, 'a'); swap(ev, 'b'); });
+          for (const sp of Object.values(c.supports || {})) { swap(sp, 'a'); swap(sp, 'b'); }
           swap(ch.defeat, 'unit');
         });
         eachScriptCmd((cmd) => { swap(cmd, 'who'); swap(cmd, 'unit'); (cmd.units || []).forEach((p) => swap(p, 'unit')); });
@@ -131,9 +132,16 @@
         eachScriptCmd((cmd) => swap(cmd, 'item'));
         break;
       case 'spirits': for (const u of Object.values(c.units)) u.spirits = (u.spirits || []).map((w) => (w === a ? b : w)); break;
+      case 'skills':
+        for (const g of ['units', 'classes']) for (const u of Object.values(c[g])) if (u.skills) u.skills = u.skills.map((w) => (w === a ? b : w));
+        eachScriptCmd((cmd) => { if (cmd.cmd === 'learn') swap(cmd, 'skill'); });
+        break;
       case 'sprites': for (const g of ['classes', 'units', 'terrains']) for (const x of Object.values(c[g])) swap(x, 'sprite'); break;
       case 'portraits': for (const u of Object.values(c.units)) swap(u, 'portrait'); eachScriptCmd((cmd) => swap(cmd, 'portrait')); break;
-      case 'scripts': eachChapter((ch) => (ch.events || []).forEach((ev) => swap(ev, 'script'))); break;
+      case 'scripts':
+        eachChapter((ch) => (ch.events || []).forEach((ev) => swap(ev, 'script')));
+        for (const sp of Object.values(c.supports || {})) (sp.ranks || []).forEach((r) => swap(r, 'script'));
+        break;
       case 'chapters':
         swap(c.meta, 'start');
         eachChapter((ch) => { ch.next = [].concat(ch.next || []).map((n) => (n === a ? b : (n && n.chapter === a ? Object.assign(n, { chapter: b }) : n))); });

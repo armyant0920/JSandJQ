@@ -89,9 +89,11 @@ srpg/
 ```jsonc
 {
   "format": "srpg-campaign", "version": 1,
-  "meta": { "title": "…", "author": "…", "start": "ch1", "permadeath": true, "rules": { "morale": true, "spirits": true } },
+  "meta": { "title": "…", "author": "…", "start": "ch1", "permadeath": true, "rules": { "morale": true, "spirits": true, "resources": true } },
   "items":    { "vulnerary": { "name":"傷藥", "kind":"heal", "power":10, "uses":3, "icon":217 } },
   "spirits":  { "strike": { "name":"必中", "cost":15, "effect":"sureHit", "target":"self" } },
+  "skills":   { "canto": { "name":"再移動", "effect":"canto" }, "luna": { "name":"月光", "effect":"luna", "rate":"skl", "rateMul":0.5 } },
+  "supports": { "alan_mira": { "a":"alan", "b":"mira", "ranks":[{ "rank":"C", "need":2, "script":"sup_alan_mira_c" }] } },
   "terrains": { "plain": { "name":"平地", "char":".", "cost":{"foot":1,"horse":1,"fly":1}, "def":0, "avo":0, "heal":0 }, … },
   "weapons":  { "iron_sword": { "name":"鐵劍", "type":"sword", "dmg":"phys", "mt":5, "hit":90, "crit":0, "range":[1,1] }, … },
   "classes":  { "lord": { "name":"領主", "move":5, "moveType":"foot", "sprite":"swordsman" }, … },
@@ -137,7 +139,7 @@ srpg/
 | **M3 編輯器 v1** | 地圖繪製、單位擺放、勝敗/事件/分歧、角色/職業/武器/道具/精神指令/地形表單、ID 改名同步引用、像素精靈編輯器、劇本指令編輯 + 對話預覽、試玩、匯出入 JSON、自動暫存 | ✅ 完成 |
 | **M4 AI 協作 & 素材** | AI 協作包、匯入 AI 回傳（差異預覽+驗證+合併）、PNG 匯入（縮放/去背/減色）、RPG Maker 行走圖、內建角色圖與圖示 | ✅ 完成 |
 | **M5a 戰鬥指令擴充** | 行動選單：攻擊（預測畫面切換武器）／杖（治療）／精神／道具／交換／交談／拜訪／壓制／待機；勇者武器（連擊）；氣力系統與氣力限制武器（必殺技）；10 種精神指令（必中/閃避/熱血/鐵壁/加速/集中/努力/信賴/氣合/激勵）；道具（傷藥/萬靈藥/能力提升/SP 回復）；敵方 AI 會用杖與喝藥；角色朝向與踏步動畫、陣營底座；22 項單元測試 | ✅ 完成 |
-| M5b 戰術深化 | 再移動（騎馬/飛行行動後可用剩餘移動力）、救出/搬運、被動技能（先制/追擊/連續/太陽/月光等，資料驅動）、武器耐久與修理、出擊準備畫面（選擇出擊成員、整備交換、商店購買）、支援對話與支援加成、敵方精神指令與 SRW 地圖兵器（範圍攻擊）、霧戰 | 待辦（下一階段） |
+| **M5b 戰術深化** | 再移動（騎馬/飛行職業技能）、救出/放下（搬運中技巧/速度減半、搬運者倒下自動放下）、資料驅動被動技能（再移動/先制/追擊/連續/太陽/月光/能力加成，可在編輯器新增、劇情中「學會」）、**體力/法力**（取代武器耐久：招式與魔法消耗、每回合回復、待機喘息）、出擊準備畫面（選人、輸送隊整備、商店買賣、軍資金）、支援對話與支援加成（C/B/A）、敵方精神指令、地圖兵器（爆炸/直線，可誤傷）、霧戰（視野） | ✅ 完成 |
 | M6 表現強化 | 戰鬥演出畫面（左右對峙、招式名稱）、WebAudio 合成音效與 BGM、地圖捲動/縮放與手機觸控、頭像美術、選單與 UI 打磨 | 待辦 |
 | M7（選配） | 編輯器內直接呼叫 AI API（玩家自備 Key）；後端：線上劇本分享、雲端存檔、AI API 代理 | 需另行討論 |
 
@@ -154,13 +156,16 @@ srpg/
 在 Claude Code 中可直接貼上：
 
 ```
-/goal 依 docs/SRPG_PLAN.md，在分支 claude/affectionate-franklin-bbpmew 完成 M5b「戰術深化」：
-依序實作 (1) 再移動 (2) 救出/搬運 (3) 資料驅動的被動技能（先制、追擊、連續、太陽、月光，可在編輯器新增）
-(4) 武器耐久 (5) 出擊準備畫面（選人、整備交換、商店）(6) 支援對話與支援加成 (7) 敵方精神指令與地圖兵器 (8) 霧戰；
-每完成一項：補 node 單元測試、在編輯器加入對應欄位、更新 AI 協作包的格式說明與示範劇本，
-執行 `node --test srpg/tests/*.test.js` 與 Playwright 冒煙測試（遊戲＋編輯器），全部通過才提交並推送；
-規則：不新增任何 npm/CDN 套件或後端；資料格式向下相容；完成後更新 docs/SRPG_PLAN.md 與 srpg/README.md。
-遇到規則取捨（例如數值平衡、技能發動率）或架構決策時停下來詢問。
+/goal 依 docs/SRPG_PLAN.md，在分支 claude/affectionate-franklin-bbpmew 完成 M6「表現強化」：
+依序實作 (1) 戰鬥演出畫面（左右對峙、HP 條、招式名稱與技能發動字樣，可在設定中關閉）
+(2) WebAudio 合成音效（攻擊/命中/必殺/治療/升級/選單，參考 HOMEGUARD 的合成方式）與簡易 BGM，含音量設定
+(3) 地圖捲動與縮放、手機觸控操作（點兩下確認、長按看資訊）
+(4) 設定選單（動畫速度、戰鬥演出開關、音量、自動結束回合）存在 localStorage
+(5) 頭像：為示範角色畫 32×32 ASCII 頭像，或支援從行走圖自動裁切的頭像框
+(6) UI 打磨：回合開始的單位資訊列、敵方行動時鏡頭跟隨、勝利/敗北條件常駐顯示；
+每完成一項：補單元測試（可測的邏輯）、Playwright 冒煙測試（遊戲＋編輯器，含手機尺寸 390×844），全部通過才提交並推送；
+規則：不新增任何 npm/CDN 套件或後端；資料格式向下相容；更新 docs/SRPG_PLAN.md 與 srpg/README.md。
+遇到美術風格、音樂風格或操作方式的取捨時停下來詢問。
 ```
 
 > 若你的 Claude Code 版本沒有 `/goal`，可改用 `/loop` 或直接貼上同一段文字作為任務描述。

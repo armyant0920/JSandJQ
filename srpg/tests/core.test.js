@@ -232,6 +232,7 @@ test('名冊：永久死亡的角色下一章不出場', () => {
 
 test('示範全章節：雙方全自動對打能正常結束', () => {
   const c = loadDemo();
+  let mapUsed = 0;
   for (const [ch, seed] of [['ch1', 1], ['ch1', 2], ['ch1', 3], ['ch2a', 4], ['ch2b', 5], ['ch3', 6], ['ch3', 7]]) {
     const b = B.createBattle(c, ch, { seed, flags: { kit_joined: true } });
     B.startPhase(b, 'player');
@@ -240,17 +241,21 @@ test('示範全章節：雙方全自動對打能正常結束', () => {
       for (const u of B.living(b, b.phase)) {
         if (u.acted || u.hp <= 0 || b.status !== 'playing') continue;
         const p = AI.plan(b, Object.assign(u, { ai: u.team === 'player' ? 'aggressive' : u.ai }));
+        for (const sid of AI.pickSpirits(b, u, p)) B.useSpirit(b, u, sid);
         if (p.x !== u.x || p.y !== u.y) B.moveUnit(b, u, p.x, p.y);
         const t = p.target && B.byUid(b, p.target);
-        if (t && t.hp > 0) B.attack(b, u, t);
+        if (p.map) { mapUsed++; B.mapAttack(b, u, p.map.weapon, p.map.at); }
+        else if (t && t.hp > 0) B.attack(b, u, t);
         else if (p.heal) B.heal(b, u, B.byUid(b, p.heal));
         else if (p.item != null) B.useItem(b, u, p.item);
         else B.wait(b, u);
       }
       if (b.status === 'playing') B.endPhase(b);
     }
-    assert.notEqual(b.status, 'playing', ch + ' seed ' + seed + ' 未結束');
+    // 壓制戰需要主動走到王座，自動對打不保證結束
+    if ((c.chapters[ch].victory || {}).type !== 'seize') assert.notEqual(b.status, 'playing', ch + ' seed ' + seed + ' 未結束');
   }
+  assert.ok(mapUsed > 0, '地圖兵器至少被使用一次');
 });
 
 test('條件出場：未說服的角色不會出現在下一章', () => {
