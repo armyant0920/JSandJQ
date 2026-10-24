@@ -899,7 +899,24 @@
     updateHud();
   }
 
+  // 觸控長按（0.5 秒）：查看單位資訊與範圍，不會選取
+  let pressT = null, longPressed = false;
+  canvas.addEventListener('pointerdown', (e) => {
+    longPressed = false;
+    if (e.pointerType !== 'touch' || !G.battle) return;
+    clearTimeout(pressT);
+    pressT = setTimeout(() => {
+      const t = tileFromEvent(e);
+      const u = seenUnitAt(t.x, t.y);
+      longPressed = true;
+      setCursor(t.x, t.y);
+      if (u && G.mode === 'idle') G.view = Object.assign(R.threatTiles(G.battle, u), { uid: u.uid });
+      if (navigator.vibrate) navigator.vibrate(20);
+    }, 500);
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach((ev) => canvas.addEventListener(ev, () => clearTimeout(pressT)));
   canvas.addEventListener('click', (e) => {
+    if (longPressed) { longPressed = false; return; }
     if (UI.busy() || !['idle', 'move', 'target', 'canto'].includes(G.mode)) return;
     const t = tileFromEvent(e);
     setCursor(t.x, t.y);

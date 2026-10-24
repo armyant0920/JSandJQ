@@ -5,7 +5,8 @@
   const C = SRPG.campaign;
   const $ = (id) => document.getElementById(id);
   const TABS = [['meta', '📘 劇本資訊'], ['chapters', '🗺 地圖章節'], ['units', '🧍 角色'], ['classes', '🎖 職業'], ['weapons', '🗡 武器'], ['items', '🧪 道具'], ['skills', '🌀 技能'], ['spirits', '✨ 精神指令'], ['supports', '💞 支援'],
-    ['terrains', '⛰ 地形'], ['sprites', '🎨 精靈圖'], ['scripts', '📜 劇本對話'], ['json', '{ } JSON']];
+    ['terrains', '⛰ 地形'], ['sprites', '🎨 精靈圖'], ['animations', '🎬 戰鬥演出'], ['scenes', '🏞 戰鬥背景'], ['sounds', '🔊 音效/BGM'],
+    ['scripts', '📜 劇本對話'], ['json', '{ } JSON']];
 
   ED.render = function () {
     const nav = $('tabs');

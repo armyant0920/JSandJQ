@@ -150,6 +150,8 @@
         ...ED.formRow('必殺', ED.num(w, 'crit')),
         ...ED.formRow('射程', rgIn('min', 0), '～', rgIn('max', 1)),
         ...ED.formRow('圖示', iconPicker(w, 'icon')),
+        ...ED.formRow('戰鬥演出', ED.select(w, 'anim', ED.named('animations'), { optional: true, optionalLabel: `（依種類：${SRPG.media.DEFAULT_ANIM_BY_TYPE[w.type] || 'slash'}）` }),
+          h('button', { onclick: () => { ED.sel.animations = SRPG.media.animFor(ED.c, w); ED.tab = 'animations'; ED.render(); } }, '✎ 編輯演出')),
         ...(w.type === 'staff' ? ED.formRow('回復量', ED.num(w, 'heal'), h('span.hint', {}, '實際回復 = 魔力 + 回復量')) : []),
         ...ED.formRow('勇者武器', ED.check(w, 'brave', '每次攻擊連續兩下')),
         ...ED.formRow('氣力需求', ED.num(w, 'morale', { attrs: { placeholder: '無' } }), h('span.hint', {}, '氣力系統開啟時，氣力不足無法使用（必殺技）')),

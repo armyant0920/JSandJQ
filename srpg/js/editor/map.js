@@ -195,6 +195,8 @@
         ...ED.formRow('勝利', ED.select(v, 'type', VICTORY, { rerender: true }), ...vParams),
         ...ED.formRow('敗北', ED.select(d, 'type', DEFEAT, { rerender: true }), ...dParams),
         ...ED.formRow('霧戰', ED.check(ch, 'fog', '只看得到我方視野內的敵人')),
+        ...ED.formRow('BGM', '我方', ED.select(ch.bgm = ch.bgm || {}, 'player', ED.named('sounds').filter(([k]) => ['bgm', 'file'].includes(ED.c.sounds[k].type)), { optional: true, optionalLabel: '（預設）' }),
+          '敵方', ED.select(ch.bgm, 'enemy', ED.named('sounds').filter(([k]) => ['bgm', 'file'].includes(ED.c.sounds[k].type)), { optional: true, optionalLabel: '（預設）' })),
         ...ED.formRow('出擊準備', ED.check(ch, 'prep', '戰前可選人、整備、購物'))),
       ch.prep ? h('div', {}, h('h3', {}, '商店商品'), h('div.chips', {}, ...ED.keys('items').concat(ED.keys('weapons')).map((id) => {
         const d = ED.c.items[id] || ED.c.weapons[id];

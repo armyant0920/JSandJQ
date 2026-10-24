@@ -185,7 +185,7 @@
     let fast = 1;
     const skip = () => { fast = 4; };
     if (own) { wrap.addEventListener('pointerdown', skip); }
-    const onKey = () => skip();
+    const onKey = () => { if (own) skip(); };
     window.addEventListener('keydown', onKey, true);
     let clock = 0, last = performance.now();
     let alive = true;
@@ -291,8 +291,8 @@
     async function playStrike(s) {
       const me = actorOf(s.by), tg = actorOf(s.target);
       const w = SRPG.rules.weaponDef({ campaign: c }, (me === A ? opts.fc.att : opts.fc.def) && (me === A ? opts.fc.att : opts.fc.def).weaponId);
-      const animId = M.animFor(c, w || { type: 'sword' });
-      const anim = c.animations[animId] || { steps: [{ type: 'hit' }] };
+      const animId = me === A && opts.anim ? opts.anim : M.animFor(c, w || { type: 'sword' });
+      const anim = (opts.animDef && me === A ? opts.animDef : c.animations[animId]) || { steps: [{ type: 'hit' }] };
       const tl = M.timeline(anim);
       const base = clock;
       let hitDone = false;
@@ -306,15 +306,16 @@
       me.x = me.homeX; tg.x = tg.homeX;
     }
 
-    return (async () => {
+    const api = { stop() { alive = false; window.removeEventListener('keydown', onKey, true); if (own && wrap) wrap.remove(); } };
+    const done = (async () => {
       await waitUntil(clock + 350);
       for (const s of opts.strikes || []) await playStrike(s);
       for (const a of [A, D]) if (a.hp <= 0) { tweens.push({ t0: clock, ms: 500, apply: (p) => { a.alpha = 1 - p; } }); if (SRPG.sound) SRPG.sound.play('death'); }
       await waitUntil(clock + 650);
-      alive = false;
-      window.removeEventListener('keydown', onKey, true);
-      if (own) wrap.remove();
+      api.stop();
     })();
+    done.stop = api.stop;
+    return done;
   }
 
   function drawCutin(ctx, c, cu, clock) {
@@ -341,5 +342,5 @@
     ctx.restore();
   }
 
-  SRPG.scene = { play, W, H };
+  SRPG.scene = { play, drawBackground, W, H };
 })();

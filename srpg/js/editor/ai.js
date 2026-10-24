@@ -6,12 +6,13 @@
   'use strict';
   const { h } = ED;
   const C = SRPG.campaign;
-  const GROUPS = ['meta', 'terrains', 'weapons', 'items', 'skills', 'spirits', 'classes', 'units', 'supports', 'sprites', 'portraits', 'chapters', 'scripts'];
+  const GROUPS = ['meta', 'terrains', 'weapons', 'items', 'skills', 'spirits', 'classes', 'units', 'supports', 'sprites', 'portraits', 'animations', 'sounds', 'scenes', 'chapters', 'scripts'];
 
   const SCOPES = {
     sprites: { label: '🎨 精靈圖 / 頭像（像素畫）', groups: ['sprites', 'portraits'], ctx: ['classes'] },
     maps: { label: '🗺 地圖與章節', groups: ['chapters'], ctx: ['terrains', 'units', 'scripts'] },
     story: { label: '📜 劇情對話', groups: ['scripts', 'chapters'], ctx: ['units'] },
+    media: { label: '🎬 戰鬥演出 / 🔊 音效與 BGM', groups: ['animations', 'sounds', 'scenes'], ctx: ['weapons'] },
     db: { label: '⚖ 角色 / 職業 / 武器 / 道具 / 精神指令', groups: ['units', 'classes', 'weapons', 'items', 'skills', 'spirits', 'supports'], ctx: ['sprites'] },
   };
   const TASKS = {
@@ -23,6 +24,11 @@
 
   // 移除過大的圖片資料
   function slim(group, data) {
+    if (group === 'sounds' || group === 'scenes') {
+      const out = {};
+      for (const [k, v] of Object.entries(data)) out[k] = v.data || v.image ? Object.assign({}, v, v.data ? { data: '(音檔資料省略，請勿修改)' } : {}, v.image ? { image: '(圖片資料省略，請勿修改)' } : {}) : v;
+      return out;
+    }
     if (group !== 'sprites' && group !== 'portraits') return data;
     const out = {};
     for (const [k, v] of Object.entries(data)) out[k] = v.image ? Object.assign({}, v, { image: '(圖片資料省略，請勿修改)' }) : v;
@@ -79,6 +85,26 @@
 - 座標 x 向右、y 向下，從 0 開始；單位不能放在無法通行的地形（牆、水）上。
 - 地圖字元：${Object.entries(ED.c.terrains).map(([k, t]) => `\`${t.char}\`=${t.name}(${k})`).join('、')}
 - 平衡建議：我方 4~6 人、敵人 6~12 人，給玩家一兩個有防禦加成的地形據點。`);
+    if (scopes.includes('media')) parts.push(`## 戰鬥演出（animations）
+每個演出是一條時間軸：{ "name", "cutin"?: true(必殺演出), "steps": [ ... ] }，武器用 "anim": 演出id 指定。
+步驟（依序執行；"with":true 與上一步同時開始；"async":true 背景執行不等待）：
+- {"type":"move","who":"self|target","to":"target|home|back","ms":200}
+- {"type":"hit"}  ← 結算傷害的時間點（每個演出放一個）
+- {"type":"wait","ms":150}
+- {"type":"particles","kind":"slash|burst|spark|ring|heal","at":"target|self","color":"#fff","count":10,"ms":300}
+- {"type":"projectile","kind":"orb|arrow|bolt","color":"#f80","size":10,"ms":300}
+- {"type":"flash","color":"#fff","ms":150}、{"type":"shake","power":8,"ms":250}、{"type":"tint","color":"rgba(0,0,0,0.6)","ms":1500,"async":true}
+- {"type":"text","text":"{weapon}！","color":"#fff","size":44,"ms":800}、{"type":"cutin","text":"{weapon}！","color":"#ffd24a","ms":900}（SRW 式頭像切入）
+- {"type":"sound","id":"音效id"}
+
+## 音效（sounds）
+- 合成音效：{ "name", "type":"synth", "vol":0.4, "tones":[{"wave":"square|sine|triangle|sawtooth|noise","f":頻率,"f2":結束頻率?,"t":開始秒,"d":長度秒,"v":相對音量?}] }
+- 合成 BGM：{ "name", "type":"bgm", "bpm":120, "vol":0.12, "loop":true, "tracks":[{"wave":"square","v":0.6,"notes":"C5 E5:0.5 G5:0.5 R:1 …"}] }（音名+八度、冒號後拍數、R 休止）
+- 系統音效 id：cursor/select/cancel/hit/crit/miss/heal/levelup/death/spirit/magic/phase/victory/defeat/buy、bgm_player/bgm_enemy（同 id 覆寫即替換）
+- 章節可指定 "bgm": { "player": 音效id, "enemy": 音效id }
+
+## 戰鬥背景（scenes，依地形 key）
+{ "forest": { "sky":["#上方色","#下方色"], "ground":"#地面色", "deco":"grass|trees|mountain|water|wall|road|castle|none" } }`);
     if (scopes.includes('story') || scopes.includes('maps')) parts.push(`## 劇本（scripts）格式：指令陣列
 \`\`\`
 [ {"cmd":"say","who":"角色id","text":"台詞","side":"left|right"},
@@ -173,6 +199,10 @@ ${compactJSON(data)}
       for (const [id, v] of Object.entries(inc[g])) {
         if (g === 'sprites' || g === 'portraits') {
           if (v && v.image === '(圖片資料省略，請勿修改)') { if (base[g][id]) v.image = base[g][id].image; else continue; }
+        }
+        if (g === 'sounds' && v && v.data === '(音檔資料省略，請勿修改)') { if (base[g][id]) v.data = base[g][id].data; else continue; }
+        if (g === 'scenes' && v && v.image === '(圖片資料省略，請勿修改)') { if (base[g][id]) v.image = base[g][id].image; else delete v.image; }
+        if (g === 'sprites' || g === 'portraits') {
           fixSprite(v);
         }
         (base[g][id] ? upd : add).push(id);
