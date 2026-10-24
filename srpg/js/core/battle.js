@@ -20,11 +20,16 @@
       units: [], nextUid: 1, fired: [], queue: [],
       rngState: (opts.seed != null ? opts.seed : (Date.now() & 0x7fffffff)) || 1,
       flags: opts.flags || {},
+      supports: clone(opts.supports || {}),
     };
     attach(b, campaign);
-    for (const p of ch.units || []) {
+    // opts.deploy：出擊準備畫面決定的我方配置 [{unit,x,y}]，取代章節中的我方配置
+    const places = opts.deploy
+      ? (ch.units || []).filter((p) => p.team !== 'player').concat(opts.deploy.map((d) => Object.assign({ team: 'player' }, d)))
+      : (ch.units || []);
+    for (const p of places) {
       if (p.team === 'player' && roster[p.unit] && roster[p.unit].dead) continue;
-      if (p.if && !C.testCond({ if: p.if }, b.flags)) continue; // 條件出場（例如 kit_joined）
+      if (!opts.deploy && p.if && !C.testCond({ if: p.if }, b.flags)) continue; // 條件出場（例如 kit_joined）
       addUnit(b, p, roster);
     }
     return b;
@@ -69,7 +74,8 @@
     return null;
   }
 
-  const living = (b, team) => b.units.filter((u) => u.hp > 0 && (!team || u.team === team));
+  // 在地圖上的單位（被救出搬運中的不算）
+  const living = (b, team) => b.units.filter((u) => R.onMap(u) && (!team || u.team === team));
   const byUid = (b, uid) => b.units.find((u) => u.uid === uid) || null;
 
   /* ---------- 事件 ---------- */
@@ -105,12 +111,13 @@
   }
 
   /* ---------- 行動 ---------- */
-  function moveUnit(b, u, x, y) {
-    const reach = R.reachable(b, u);
+  function moveUnit(b, u, x, y, moveOverride) {
+    const reach = R.reachable(b, u, moveOverride);
     const n = reach.get(x + ',' + y);
     if (!n || !n.stop) return null;
     const path = R.pathTo(reach, x, y);
-    if (!u.prevPos) u.prevPos = { x: u.x, y: u.y };
+    if (!u.prevPos) u.prevPos = { x: u.x, y: u.y, used: u.moveUsed || 0 };
+    u.moveUsed = (u.prevPos.used || 0) + n.cost;
     if (path.length > 1) {
       const a = path[path.length - 2], z = path[path.length - 1];
       u.dir = z.y > a.y ? 0 : z.x < a.x ? 1 : z.x > a.x ? 2 : 3;
@@ -120,7 +127,7 @@
   }
 
   function undoMove(u) {
-    if (u.prevPos && !u.acted) { u.x = u.prevPos.x; u.y = u.prevPos.y; u.moved = false; delete u.prevPos; }
+    if (u.prevPos && !u.acted) { u.x = u.prevPos.x; u.y = u.prevPos.y; u.moveUsed = u.prevPos.used || 0; u.moved = false; delete u.prevPos; }
   }
 
   // 選擇可在距離 d 使用的攻擊武器（威力最高者）
@@ -159,8 +166,37 @@
     return living(b).filter((o) => o !== u && o.team === u.team && dist(o, u) === 1);
   }
 
+  // 救出：相鄰、同陣營、雙方都沒有在搬運
+  function rescueTargets(b, u) {
+    if (u.carrying) return [];
+    return living(b).filter((o) => o !== u && o.team === u.team && dist(o, u) === 1 && !o.carrying);
+  }
+  // 放下：相鄰、空的、被搬運者能站立的格子
+  function dropTiles(b, u) {
+    const c = u.carrying && byUid(b, u.carrying);
+    if (!c) return [];
+    return [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([dx, dy]) => ({ x: u.x + dx, y: u.y + dy }))
+      .filter((p) => R.moveCost(R.terrainAt(b, p.x, p.y), c.moveType) < Infinity && !R.unitAt(b, p.x, p.y));
+  }
+
+  // 支援對話：相鄰、已累積足夠支援值、下一階段尚未看過
+  function nextSupportRank(b, a, o) {
+    const k = R.supportKey(a.id, o.id);
+    const def = Object.values(b.campaign.supports).find((s) => R.supportKey(s.a, s.b) === k);
+    if (!def) return null;
+    const st = b.supports[k] || { points: 0, rank: null };
+    const ranks = def.ranks || [];
+    const idx = st.rank ? ranks.findIndex((r) => r.rank === st.rank) + 1 : 0;
+    const nr = ranks[idx];
+    return nr && st.points >= (nr.need || 0) ? nr : null;
+  }
+  function supportTargets(b, u) {
+    if (u.team !== 'player') return [];
+    return living(b, 'player').filter((o) => o !== u && dist(o, u) === 1 && nextSupportRank(b, u, o));
+  }
+
   function spiritsUsable(b, u) {
-    if (!R.rulesOf(b).spirits || u.team !== 'player') return [];
+    if (!R.rulesOf(b).spirits) return [];
     return (u.spirits || []).map((id) => Object.assign({ id }, b.campaign.spirits[id])).filter((s) => s.effect);
   }
 
@@ -169,10 +205,14 @@
     const acts = [];
     if (targetsFrom(b, u).length) acts.push({ id: 'attack', name: '攻擊' });
     if (healTargets(b, u).length) acts.push({ id: 'staff', name: '杖' });
+    if (R.mapWeapons(b, u).length) acts.push({ id: 'mapAttack', name: '地圖兵器' });
     const sp = spiritsUsable(b, u);
     if (sp.length) acts.push({ id: 'spirit', name: '精神', free: true, disabled: !sp.some((s) => (s.cost || 0) <= u.sp) });
     if ((u.items || []).length) acts.push({ id: 'item', name: '道具' });
     if (u.team === 'player' && tradePartners(b, u).length) acts.push({ id: 'trade', name: '交換', free: true });
+    if (u.team === 'player' && rescueTargets(b, u).length) acts.push({ id: 'rescue', name: '救出' });
+    if (u.team === 'player' && dropTiles(b, u).length) acts.push({ id: 'drop', name: '放下' });
+    if (supportTargets(b, u).length) acts.push({ id: 'support', name: '支援' });
     const talkTo = living(b).filter((o) => o !== u && dist(o, u) === 1 && hasEvent(b, 'talk', { a: u.id, b: o.id }));
     if (u.team === 'player' && talkTo.length) acts.push({ id: 'talk', name: '交談', targets: talkTo.map((o) => o.uid) });
     if (u.team === 'player' && hasEvent(b, 'visit', { x: u.x, y: u.y })) acts.push({ id: 'visit', name: '拜訪' });
@@ -182,11 +222,35 @@
     return acts;
   }
 
-  function finishAction(b, u) {
+  // canto:true 的行動完成後，有「再移動」技能的我方單位可用剩餘移動力移動（u.cantoMove）
+  function finishAction(b, u, canto) {
     u.acted = true;
+    const left = R.moveOf(u) - (u.moveUsed || 0);
     delete u.prevPos;
     if (u.buffs) delete u.buffs.accel;
+    if (canto && u.team === 'player' && u.hp > 0 && left > 0 && R.hasSkill(b, u, 'canto')) u.cantoMove = left;
     checkOutcome(b);
+  }
+
+  // 再移動：回傳路徑
+  function cantoMove(b, u, x, y) {
+    if (!u.cantoMove) return null;
+    const path = moveUnit(b, u, x, y, u.cantoMove);
+    delete u.prevPos;
+    delete u.cantoMove;
+    return path;
+  }
+  function endCanto(u) { delete u.cantoMove; }
+
+  // 搬運者倒下或被移除時，放下被搬運的單位
+  function dropOnDeath(b, u) {
+    const c = u.carrying && byUid(b, u.carrying);
+    if (!c) return null;
+    delete u.carrying; delete c.carriedBy;
+    c.x = u.x; c.y = u.y;
+    const free = R.unitAt(b, c.x, c.y) && R.unitAt(b, c.x, c.y) !== c ? nearestFree(b, u.x, u.y) : null;
+    if (free) { c.x = free.x; c.y = free.y; }
+    return c;
   }
 
   function gainExp(b, me, e, res) {
@@ -208,9 +272,78 @@
       R.addMorale(b, me, 1 + (didHit ? 1 : 0) + (killed ? 3 : 0));
       gainExp(b, me, R.expGain(me, foe, didHit, killed), res);
     }
-    for (const d of [u, t]) if (d.hp <= 0) { res.deaths.push(d); fire(b, 'death', { unit: d.id }); }
-    finishAction(b, u);
+    for (const d of [u, t]) if (d.hp <= 0) { res.deaths.push(d); dropOnDeath(b, d); fire(b, 'death', { unit: d.id }); }
+    finishAction(b, u, true);
     return res;
+  }
+
+  // 地圖兵器：at 為中心（burst）或方向格（line）。所有範圍內目標各受一擊、不會反擊
+  function mapAttack(b, u, weaponIdx, at) {
+    const w = R.weaponDef(b, u.weapons[weaponIdx]);
+    if (!w || !R.isMapWeapon(w) || !R.usable(b, u, w)) return null;
+    const area = R.mapArea(b, u, w, at);
+    const victims = R.mapVictims(b, u, w, area);
+    const res = { area, strikes: [], exp: {}, levelUps: {}, deaths: [] };
+    const RU = R.rulesOf(b);
+    let expSum = 0;
+    for (const v of victims) {
+      const s = R.combatSide(b, u, v, u, v, { weapon: w, ignoreRange: true });
+      if (!s) continue;
+      let hit, evaded = false;
+      if (v.buffs && v.buffs.alert) { hit = false; evaded = true; delete v.buffs.alert; }
+      else hit = b.rng.roll(s.hitBase);
+      const crit = hit && b.rng.roll(s.crit);
+      const dmg = hit ? Math.min(v.hp, crit ? s.dmg * RU.critMult : s.dmg) : 0;
+      v.hp -= dmg;
+      res.strikes.push({ by: u.uid, target: v.uid, hit, crit, dmg, hpAfter: v.hp, evaded, skills: [] });
+      if (!R.friendly(v.team, u.team)) expSum += R.expGain(u, v, hit, v.hp <= 0);
+      R.addMorale(b, v, 1);
+      if (v.hp <= 0) { res.deaths.push(v); dropOnDeath(b, v); fire(b, 'death', { unit: v.id }); }
+    }
+    R.payCost(b, u, w);
+    if (u.buffs) delete u.buffs.valor;
+    R.addMorale(b, u, 1 + res.deaths.length * 3);
+    gainExp(b, u, Math.min(100, expSum), res);
+    finishAction(b, u, true);
+    return res;
+  }
+
+  function rescue(b, u, t) {
+    if (!rescueTargets(b, u).includes(t)) return false;
+    u.carrying = t.uid; t.carriedBy = u.uid; t.acted = true;
+    finishAction(b, u, true);
+    return true;
+  }
+
+  function drop(b, u, x, y) {
+    if (!dropTiles(b, u).some((p) => p.x === x && p.y === y)) return null;
+    const c = byUid(b, u.carrying);
+    delete u.carrying; delete c.carriedBy;
+    c.x = x; c.y = y;
+    finishAction(b, u, true);
+    return c;
+  }
+
+  function supportTalk(b, u, o) {
+    const nr = nextSupportRank(b, u, o);
+    if (!nr) return null;
+    const k = R.supportKey(u.id, o.id);
+    b.supports[k] = Object.assign(b.supports[k] || { points: 0 }, { rank: nr.rank });
+    if (nr.script) b.queue.push(nr.script);
+    finishAction(b, u, true);
+    return nr;
+  }
+
+  // 支援值：我方回合開始時，有支援關係且距離 ≤ 2 的同伴 +1
+  function gainSupportPoints(b) {
+    const units = living(b, 'player');
+    for (const def of Object.values(b.campaign.supports)) {
+      const a = units.find((x) => x.id === def.a), c = units.find((x) => x.id === def.b);
+      if (!a || !c || dist(a, c) > 2) continue;
+      const k = R.supportKey(def.a, def.b);
+      b.supports[k] = b.supports[k] || { points: 0, rank: null };
+      b.supports[k].points++;
+    }
   }
 
   // 杖：回傳 { amount, exp, levelUps }
@@ -220,9 +353,10 @@
     if (!pick) return null;
     const amount = Math.min(t.stats.hp - t.hp, R.healAmount(b, u, pick.w));
     t.hp += amount;
+    R.payCost(b, u, pick.w);
     const res = { amount, exp: {}, levelUps: {} };
     gainExp(b, u, 11 + Math.floor(amount / 2), res);
-    finishAction(b, u);
+    finishAction(b, u, true);
     return res;
   }
 
@@ -236,12 +370,14 @@
       case 'heal': { const n = Math.min(u.stats.hp - u.hp, def.power || 10); u.hp += n; text = `HP +${n}`; break; }
       case 'boost': { const k = def.stat || 'str', n = def.power || 1; u.stats[k] += n; if (k === 'hp') u.hp += n; text = `${C.STAT_NAMES[k] || k} +${n}`; break; }
       case 'sp': { const n = Math.min(u.maxSp - u.sp, def.power || 10); u.sp += n; text = `SP +${n}`; break; }
+      case 'mp': { const n = Math.min(u.maxMp - u.mp, def.power || 10); u.mp += n; text = `MP +${n}`; break; }
+      case 'st': { const n = Math.min(u.maxSt - u.st, def.power || 10); u.st += n; text = `體力 +${n}`; break; }
       case 'morale': R.addMorale(b, u, def.power || 10); text = `氣力 +${def.power || 10}`; break;
       default: text = def.name;
     }
     it.uses = (it.uses || 1) - 1;
     if (it.uses <= 0) u.items.splice(idx, 1);
-    if (!(opts && opts.free)) finishAction(b, u);
+    if (!(opts && opts.free)) finishAction(b, u, true);
     return { text };
   }
 
@@ -290,17 +426,28 @@
     return living(b).filter((o) => o !== u && R.friendly(o.team, u.team));
   }
 
-  function talk(b, u, other) { fire(b, 'talk', { a: u.id, b: other.id }); finishAction(b, u); }
-  function visit(b, u) { fire(b, 'visit', { x: u.x, y: u.y }); finishAction(b, u); }
+  function talk(b, u, other) { fire(b, 'talk', { a: u.id, b: other.id }); finishAction(b, u, true); }
+  function visit(b, u) { fire(b, 'visit', { x: u.x, y: u.y }); finishAction(b, u, true); }
   function seize(b, u) { u.acted = true; b.status = 'victory'; fire(b, 'victory'); }
-  function wait(b, u) { finishAction(b, u); }
+  // 待機：資源系統開啟時額外回復體力（喘口氣）
+  function wait(b, u) {
+    const RU = R.rulesOf(b);
+    if (RU.resources && u.maxSt) u.st = Math.min(u.maxSt, u.st + RU.restSt);
+    finishAction(b, u);
+  }
 
   /* ---------- 回合 ---------- */
   function startPhase(b, phase) {
     b.phase = phase;
     const msgs = [];
-    for (const u of living(b, phase)) {
-      u.acted = false; u.moved = false; delete u.prevPos;
+    const RU = R.rulesOf(b);
+    if (phase === 'player') gainSupportPoints(b);
+    for (const u of b.units.filter((x) => x.hp > 0 && x.team === phase)) {
+      u.acted = !!u.carriedBy; u.moved = false; u.moveUsed = 0; delete u.prevPos; delete u.cantoMove;
+      if (RU.resources) {
+        if (u.maxSt) u.st = Math.min(u.maxSt, u.st + RU.stRegen);
+        if (u.maxMp) u.mp = Math.min(u.maxMp, u.mp + RU.mpRegen);
+      }
       if (u.buffs) for (const k of Object.keys(u.buffs)) if ((R.EFFECTS[k] || {}).kind === 'turn') delete u.buffs[k];
       const t = R.terrainAt(b, u.x, u.y);
       if (t && t.heal && u.hp < u.stats.hp) {
@@ -363,7 +510,7 @@
       if (u.team !== 'player') continue;
       roster[u.id] = {
         level: u.level, exp: u.exp, stats: clone(u.stats), weapons: clone(u.weapons), items: clone(u.items || []),
-        dead: permadeath && u.hp <= 0,
+        skills: clone(u.skills || []), dead: permadeath && u.hp <= 0,
       };
     }
     return roster;
@@ -387,12 +534,20 @@
     return u;
   }
 
+  function learn(b, unitId, skillId) {
+    const u = b.units.find((x) => x.id === unitId && x.hp > 0);
+    if (!u || !b.campaign.skills[skillId]) return null;
+    if (!u.skills.includes(skillId)) u.skills.push(skillId);
+    return u;
+  }
+
   SRPG.battle = {
     PHASES, PHASE_NAMES, createBattle, attach, serialize, restore, addUnit, living, byUid,
     fire, hasEvent, moveUnit, undoMove, autoEquip, weaponsFor, targetsFrom, previewAttack, actionsFor,
-    healTargets, tradePartners, spiritsUsable, spiritTargets,
-    attack, heal, useItem, transfer, useSpirit, talk, visit, seize, wait, startPhase, endPhase, phaseDone, checkOutcome,
-    objectiveText, commitRoster, spawn, recruit, give,
+    healTargets, tradePartners, spiritsUsable, spiritTargets, rescueTargets, dropTiles, supportTargets, nextSupportRank,
+    attack, mapAttack, heal, useItem, transfer, useSpirit, rescue, drop, supportTalk, gainSupportPoints,
+    cantoMove, endCanto, talk, visit, seize, wait, startPhase, endPhase, phaseDone, checkOutcome,
+    objectiveText, commitRoster, spawn, recruit, give, learn,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = SRPG;
 })(typeof window !== 'undefined' ? window : globalThis);

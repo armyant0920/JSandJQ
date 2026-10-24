@@ -34,10 +34,25 @@
     cheer:    { name: '激勵', cost: 40, effect: 'morale', value: 5, target: 'allies', desc: '全體同伴氣力 +5' },
   };
 
-  // 預設道具：kind = heal(回復 HP) / boost(永久能力) / sp(回復 SP) / morale(氣力)
+  // 預設道具：kind = heal(HP) / boost(永久能力) / sp / mp(法力) / st(體力) / morale(氣力)
   const BASE_ITEMS = {
-    vulnerary: { name: '傷藥', kind: 'heal', power: 10, uses: 3, icon: 217, desc: '回復 10 HP' },
-    elixir:    { name: '萬靈藥', kind: 'heal', power: 99, uses: 1, icon: 225, desc: 'HP 全回復' },
+    vulnerary: { name: '傷藥', kind: 'heal', power: 10, uses: 3, icon: 217, price: 300, desc: '回復 10 HP' },
+    elixir:    { name: '萬靈藥', kind: 'heal', power: 99, uses: 1, icon: 225, price: 1200, desc: 'HP 全回復' },
+    ether:     { name: '魔力水', kind: 'mp', power: 10, uses: 2, icon: 218, price: 500, desc: '回復 10 MP' },
+    tonic:     { name: '提神藥', kind: 'st', power: 10, uses: 2, icon: 219, price: 400, desc: '回復 10 體力' },
+  };
+
+  /* 預設被動技能（effect 種類見 rules.SKILL_EFFECTS）
+     rate：發動率，可為數字或能力名稱（spd/skl/lck…），rateMul 為倍率 */
+  const BASE_SKILLS = {
+    canto:   { name: '再移動', effect: 'canto', desc: '行動後可用剩餘的移動力再移動' },
+    vantage: { name: '先制', effect: 'vantage', value: 50, desc: 'HP 50% 以下被攻擊時先出手' },
+    pursuit: { name: '追擊', effect: 'pursuit', value: 2, desc: '追擊所需的速度差 -2' },
+    adept:   { name: '連續', effect: 'adept', rate: 'spd', desc: '速度% 機率連續攻擊兩次' },
+    sol:     { name: '太陽', effect: 'sol', rate: 'skl', desc: '技巧% 機率吸收造成的傷害' },
+    luna:    { name: '月光', effect: 'luna', rate: 'skl', rateMul: 0.5, desc: '技巧/2% 機率無視防禦' },
+    keen:    { name: '銳眼', effect: 'bonus', hit: 15, crit: 10, desc: '命中 +15、必殺 +10' },
+    guard:   { name: '堅守', effect: 'bonus', avo: 10, block: 2, desc: '迴避 +10、受到傷害 -2' },
   };
 
   function normalize(raw) {
@@ -49,6 +64,8 @@
     c.terrains = Object.assign({}, clone(BASE_TERRAINS), c.terrains || {});
     c.spirits = Object.assign({}, clone(BASE_SPIRITS), c.spirits || {});
     c.items = Object.assign({}, clone(BASE_ITEMS), c.items || {});
+    c.skills = Object.assign({}, clone(BASE_SKILLS), c.skills || {});
+    c.supports = c.supports || {};
     for (const k of ['weapons', 'classes', 'units', 'sprites', 'portraits', 'chapters', 'scripts']) c[k] = c[k] || {};
     if (!c.meta.start) c.meta.start = Object.keys(c.chapters)[0] || null;
     return c;
@@ -65,6 +82,15 @@
       for (const w of u.weapons || []) if (!c.weapons[w]) errs.push(`角色 ${id} 的武器 ${w} 不存在`);
       for (const it of u.items || []) if (!c.items[it]) errs.push(`角色 ${id} 的道具 ${it} 不存在`);
       for (const sp of u.spirits || []) if (!c.spirits[sp]) errs.push(`角色 ${id} 的精神指令 ${sp} 不存在`);
+      for (const sk of u.skills || []) if (!c.skills[sk]) errs.push(`角色 ${id} 的技能 ${sk} 不存在`);
+    }
+    for (const [id, cl] of Object.entries(c.classes)) for (const sk of cl.skills || []) if (!c.skills[sk]) errs.push(`職業 ${id} 的技能 ${sk} 不存在`);
+    for (const [id, sk] of Object.entries(c.skills)) {
+      if (!SRPG.rules || !SRPG.rules.SKILL_EFFECTS[sk.effect]) errs.push(`技能 ${id} 的效果 ${sk.effect} 不存在`);
+    }
+    for (const [id, sp] of Object.entries(c.supports)) {
+      if (!c.units[sp.a] || !c.units[sp.b]) errs.push(`支援 ${id} 的角色不存在`);
+      for (const r of sp.ranks || []) if (r.script && !c.scripts[r.script]) errs.push(`支援 ${id} 的劇本 ${r.script} 不存在`);
     }
     for (const [id, ch] of Object.entries(c.chapters)) {
       let grid;
@@ -74,6 +100,8 @@
         if (p.x < 0 || p.y < 0 || p.x >= grid.w || p.y >= grid.h) errs.push(`章節 ${id}：單位 ${p.unit} 在地圖外 (${p.x},${p.y})`);
       }
       for (const ev of ch.events || []) if (ev.script && !c.scripts[ev.script]) errs.push(`章節 ${id}：劇本 ${ev.script} 不存在`);
+      for (const sid of ch.shop || []) if (!c.items[sid] && !c.weapons[sid]) errs.push(`章節 ${id}：商店商品 ${sid} 不存在`);
+      for (const p of ch.deploySlots || []) if (p.x < 0 || p.y < 0 || p.x >= grid.w || p.y >= grid.h) errs.push(`章節 ${id}：出擊位置在地圖外 (${p.x},${p.y})`);
       for (const n of [].concat(ch.next || [])) {
         const cid = typeof n === 'string' ? n : n.chapter;
         if (cid && !c.chapters[cid]) errs.push(`章節 ${id}：下一章 ${cid} 不存在`);
@@ -144,7 +172,11 @@
       sprite: def.sprite || cls.sprite || null, portrait: def.portrait || null,
       ai: place.ai || 'aggressive', boss: !!place.boss, lord: !!(def.lord || place.lord),
       items, spirits: clone(def.spirits || cls.spirits || []),
+      skills: [...new Set([].concat(cls.skills || [], def.skills || [], (saved && saved.skills) || []))],
       sp: def.sp || 0, maxSp: def.sp || 0,
+      mp: def.mp != null ? def.mp : (cls.mp || 0), maxMp: def.mp != null ? def.mp : (cls.mp || 0),
+      st: def.st != null ? def.st : (cls.st || 0), maxSt: def.st != null ? def.st : (cls.st || 0),
+      vision: def.vision || cls.vision || 3, moveUsed: 0,
       morale: def.morale || rules.moraleStart, buffs: {}, dir: place.team === 'enemy' ? 1 : 2,
       acted: false, moved: false,
     };
@@ -173,6 +205,6 @@
     return neg ? !ok : ok;
   }
 
-  SRPG.campaign = { STAT_KEYS, STAT_NAMES, BASE_TERRAINS, BASE_SPIRITS, BASE_ITEMS, normalize, validate, parseMap, defaultLegend, makeUnit, resolveNext, testCond };
+  SRPG.campaign = { STAT_KEYS, STAT_NAMES, BASE_TERRAINS, BASE_SPIRITS, BASE_ITEMS, BASE_SKILLS, normalize, validate, parseMap, defaultLegend, makeUnit, resolveNext, testCond };
   if (typeof module !== 'undefined' && module.exports) module.exports = SRPG;
 })(typeof window !== 'undefined' ? window : globalThis);

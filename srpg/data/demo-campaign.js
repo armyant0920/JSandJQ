@@ -207,6 +207,7 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "power": 10,
    "uses": 3,
    "icon": 217,
+   "price": 300,
    "desc": "回復 10 HP"
   },
   "elixir": {
@@ -215,6 +216,7 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "power": 99,
    "uses": 1,
    "icon": 225,
+   "price": 1200,
    "desc": "HP 全回復"
   },
   "power_ring": {
@@ -224,6 +226,7 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "power": 2,
    "uses": 1,
    "icon": 233,
+   "price": 3000,
    "desc": "力量永久 +2"
   },
   "sp_potion": {
@@ -232,6 +235,7 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "power": 20,
    "uses": 1,
    "icon": 229,
+   "price": 800,
    "desc": "SP +20"
   }
  },

@@ -40,7 +40,56 @@
     return best;
   }
 
-  /* 回傳 { x, y, target?:uid, heal?:uid, item?:索引 } */
+  // 地圖兵器：找出能打到最多敵人（扣掉誤傷同伴）的位置與中心
+  function planMap(b, u, reach) {
+    let best = null;
+    for (const { i, w } of R.mapWeapons(b, u)) {
+      for (const n of reach.values()) {
+        if (!n.stop) continue;
+        const ox = u.x, oy = u.y;
+        u.x = n.x; u.y = n.y;
+        for (const at of R.mapCenters(b, u, w)) {
+          let sc = 0;
+          for (const v of R.mapVictims(b, u, w, R.mapArea(b, u, w, at))) {
+            const s = R.combatSide(b, u, v, u, v, { weapon: w, ignoreRange: true });
+            if (!s) continue;
+            const ev = Math.min(v.hp, s.dmg) * s.hit / 100 + (s.dmg >= v.hp ? 10 * s.hit / 100 : 0);
+            sc += R.friendly(v.team, u.team) ? -ev * 2 : ev;
+          }
+          if (sc > 0 && (!best || sc > best.score)) best = { x: n.x, y: n.y, map: { weapon: i, at }, score: sc - n.cost * 0.01 };
+        }
+        u.x = ox; u.y = oy;
+      }
+    }
+    return best;
+  }
+
+  /* 敵方精神指令：依計畫決定要用哪些（回傳精神指令 id 陣列，尚未施放） */
+  function pickSpirits(b, u, p) {
+    if (!R.rulesOf(b).spirits || !(u.spirits || []).length) return [];
+    const has = (eff) => (u.spirits || []).find((id) => { const s = b.campaign.spirits[id]; return s && s.effect === eff && (s.cost || 0) <= u.sp; });
+    const out = [];
+    let budget = u.sp;
+    const take = (id) => { if (!id) return; const c = b.campaign.spirits[id].cost || 0; if (c <= budget) { budget -= c; out.push(id); } };
+    const t = p && p.target && B.byUid(b, p.target);
+    if (t) {
+      const ox = u.x, oy = u.y; u.x = p.x; u.y = p.y;
+      const fc = B.previewAttack(b, u, t);
+      u.x = ox; u.y = oy;
+      if (fc.att) {
+        const sh = has('sureHit');
+        if (sh && fc.att.hit < 75) take(sh);
+        const vl = has('valor');
+        const total = fc.att.dmg * fc.att.strikes;
+        if (vl && (total < t.hp && total * 2 >= t.hp || t.lord)) take(vl);
+      }
+    }
+    const iw = has('ironWall');
+    if (iw && (u.boss || u.hp <= u.stats.hp / 2)) take(iw);
+    return out;
+  }
+
+  /* 回傳 { x, y, target?:uid, heal?:uid, item?:索引, map?:{weapon,at} } */
   function plan(b, u) {
     const reach = u.ai === 'hold' ? new Map([[key(u.x, u.y), { x: u.x, y: u.y, cost: 0, stop: true }]]) : R.reachable(b, u);
     const foes = B.living(b).filter((o) => !R.friendly(o.team, u.team));
@@ -61,6 +110,8 @@
         if (!best || sc > best.score) best = { x: n.x, y: n.y, target: t.uid, score: sc };
       }
     }
+    const mp = planMap(b, u, reach);
+    if (mp && (!best || mp.score > best.score * 0.8)) return mp;
     if (best) return best;
     if (hv) return hv;
     if (u.ai !== 'aggressive' || !foes.length) return { x: u.x, y: u.y, target: null };
@@ -83,6 +134,6 @@
     return { x: dest.x, y: dest.y, target: null };
   }
 
-  SRPG.ai = { plan, scoreAttack };
+  SRPG.ai = { plan, scoreAttack, planMap, pickSpirits };
   if (typeof module !== 'undefined' && module.exports) module.exports = SRPG;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -7,9 +7,9 @@ const fs = require('fs');
 const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
-for (const f of ['util', 'campaign', 'rules', 'battle', 'ai', 'script', 'save']) require(path.join(ROOT, 'js/core', f + '.js'));
+for (const f of ['util', 'campaign', 'rules', 'battle', 'ai', 'script', 'save', 'prep']) require(path.join(ROOT, 'js/core', f + '.js'));
 const SRPG = globalThis.SRPG;
-const { campaign: C, rules: R, battle: B, ai: AI, script: S, save: SV, util: U } = SRPG;
+const { campaign: C, rules: R, battle: B, ai: AI, script: S, save: SV, util: U, prep: P } = SRPG;
 
 function loadDemo() {
   const ctx = { window: {} };
@@ -372,4 +372,204 @@ test('敵方 AI 會用杖治療、低血量會喝藥', () => {
   assert.equal(p.heal, e.uid);
   h.hp = 2; e.hp = e.stats.hp;
   assert.equal(AI.plan(b, h).item, 0);
+});
+
+/* ---------- M5b 戰術深化 ---------- */
+function mini3() {
+  const c = mini2();
+  c.meta.rules.resources = true;
+  c.classes.horse = { move: 5, moveType: 'horse', skills: ['canto'] };
+  c.units.k = { name: 'K', class: 'horse', stats: { hp: 20, str: 5, skl: 5, spd: 5, def: 3 }, weapons: ['sword'] };
+  c.chapters.c.map.rows = ['........', '........', '........', '........'];
+  return c;
+}
+
+test('再移動：攻擊後可用剩餘移動力移動', () => {
+  const c = mini3();
+  const b = B.createBattle(c, 'c', { seed: 1 });
+  const e = b.units[1]; e.x = 3; e.y = 2; e.hp = 99; e.stats.hp = 99;
+  const k = B.addUnit(b, { unit: 'k', team: 'player', x: 0, y: 2 });
+  B.moveUnit(b, k, 2, 2);
+  B.attack(b, k, e);
+  assert.equal(k.cantoMove, 3);
+  assert.ok(B.cantoMove(b, k, 2, 3));
+  assert.equal(k.cantoMove, undefined);
+  assert.ok(k.acted);
+  const a = b.units[0];                        // 沒有技能的單位不會再移動
+  a.acted = false; e.x = 1; e.y = 1; a.x = 1; a.y = 0;
+  B.attack(b, a, e);
+  assert.equal(a.cantoMove, undefined);
+});
+
+test('救出與放下：被搬運者離開地圖、搬運者能力減半、倒下時放下', () => {
+  const c = mini3();
+  const b = B.createBattle(c, 'c', { seed: 1 });
+  const a = b.units[0];
+  const k = B.addUnit(b, { unit: 'k', team: 'player', x: 1, y: 0 });
+  assert.deepEqual(B.rescueTargets(b, k).map((u) => u.uid), [a.uid]);
+  const foe = b.units[1];
+  const before = R.combatSide(b, foe, k, { x: 2, y: 0 }, k);
+  B.rescue(b, k, a);
+  assert.equal(R.unitAt(b, 0, 0), null);
+  assert.ok(!B.living(b, 'player').includes(a));
+  const after = R.combatSide(b, foe, k, { x: 2, y: 0 }, k);
+  assert.ok(after.hit > before.hit);   // 搬運中速度減半 → 迴避下降
+  k.acted = false;
+  assert.ok(B.dropTiles(b, k).length >= 2);
+  B.drop(b, k, 1, 1);
+  assert.equal(a.x, 1); assert.equal(a.y, 1); assert.ok(!a.carriedBy);
+  // 搬運者被擊倒 → 被搬運者回到地圖
+  k.acted = false; B.rescue(b, k, a);
+  foe.x = 2; foe.y = 0; k.hp = 1; foe.stats.skl = 99;
+  B.attack(b, foe, k);
+  assert.equal(k.hp, 0);
+  assert.ok(!a.carriedBy && a.hp > 0 && R.unitAt(b, a.x, a.y) === a);
+});
+
+test('被動技能：先制、追擊、銳眼、月光、太陽、連續', () => {
+  const c = mini3();
+  const b = B.createBattle(c, 'c', { seed: 1 });
+  const [a, e] = b.units;
+  e.x = 1; e.y = 0;
+  a.skills = ['keen'];
+  const base = R.combatSide(b, e, a, e, a);
+  a.skills = [];
+  const s0 = R.forecast(b, a, e).att;
+  a.skills = ['keen'];
+  const s1 = R.forecast(b, a, e).att;
+  assert.ok(s1.crit === s0.crit + 10);
+  // 先制
+  e.skills = ['vantage']; e.hp = 5;
+  const r = R.resolveCombat(b, a, e, U.makeRng(9));
+  assert.equal(r.vantage, true);
+  assert.equal(r.strikes[0].by, e.uid);
+  // 追擊：速度差 3 平常不追擊，有技能時追擊
+  e.hp = 20; e.skills = []; e.stats.spd = 6; a.stats.spd = 3;
+  assert.equal(R.forecast(b, e, a).att.count, 1);
+  e.skills = ['pursuit'];
+  assert.equal(R.forecast(b, e, a).att.count, 2);
+  // 100% 發動的月光 / 太陽 / 連續
+  c.skills.luna100 = { name: 'L', effect: 'luna', rate: 100 };
+  c.skills.sol100 = { name: 'S', effect: 'sol', rate: 100 };
+  c.skills.adept100 = { name: 'A', effect: 'adept', rate: 100 };
+  a.skills = ['luna100', 'sol100', 'adept100']; a.hp = 10; a.stats.spd = 0;
+  e.hp = 99; e.stats.hp = 99; e.skills = []; e.stats.spd = 0;
+  const r2 = R.resolveCombat(b, a, e, U.makeRng(1));
+  const mine = r2.strikes.filter((s) => s.by === a.uid);
+  assert.equal(mine.length, 2);
+  assert.ok(mine[0].skills.includes('L') && mine[0].skills.includes('S'));
+  assert.ok(a.hp > 10);
+  assert.ok(mine.some((s) => s.dmg === r2.fc.att.dmgLuna || !s.hit));
+});
+
+test('體力/法力：武器消耗、不足無法使用、回合回復與待機喘息', () => {
+  const c = mini3();
+  c.weapons.power = { name: '重擊', type: 'sword', mt: 10, hit: 100, range: [1, 1], cost: 5 };
+  c.weapons.spell = { name: '法術', type: 'anima', dmg: 'mag', mt: 5, hit: 100, range: [1, 2], cost: 4 };
+  c.units.a.st = 8; c.units.a.mp = 4;
+  c.units.a.weapons = ['power', 'spell'];
+  const b = B.createBattle(c, 'c', { seed: 1 });
+  const [a, e] = b.units; e.x = 1; e.y = 0; e.hp = 99; e.stats.hp = 99; e.stats.spd = 99;
+  assert.equal(R.weaponCost(c.weapons.power).type, 'st');
+  assert.equal(R.weaponCost(c.weapons.spell).type, 'mp');
+  B.attack(b, a, e, 0);
+  assert.equal(a.st, 3);
+  assert.deepEqual(B.weaponsFor(b, a, 1).map((x) => x.i), [1]);   // 體力不足，只剩法術
+  B.endPhase(b); B.endPhase(b);
+  assert.equal(a.st, 3 + 3);           // 回合開始回復 +3
+  B.wait(b, a);
+  assert.equal(a.st, 8);               // 待機喘息 +3（上限 8）
+  c.meta.rules.resources = false;
+  a.st = 0;
+  assert.equal(B.weaponsFor(b, a, 1).length, 2);  // 關閉資源系統時不檢查
+});
+
+test('地圖兵器：範圍內所有敵人各受一擊、不反擊、消耗法力', () => {
+  const c = mini3();
+  c.weapons.storm = { name: '風暴', type: 'anima', dmg: 'mag', mt: 8, hit: 100, range: [1, 3], cost: 6, map: { shape: 'burst', size: 1 } };
+  c.units.a.weapons = ['sword', 'storm']; c.units.a.mp = 10; c.units.a.stats.mag = 5;
+  const b = B.createBattle(c, 'c', { seed: 1 });
+  const [a, e] = b.units;
+  const e2 = B.addUnit(b, { unit: 'e', team: 'enemy', x: 3, y: 1 });
+  e.x = 3; e.y = 0;
+  assert.ok(B.actionsFor(b, a).some((x) => x.id === 'mapAttack'));
+  assert.equal(B.targetsFrom(b, a).length, 0);    // 地圖兵器不算一般攻擊
+  const res = B.mapAttack(b, a, 1, { x: 3, y: 1 });
+  assert.equal(res.strikes.length, 2);
+  assert.ok(e.hp < 20 && e2.hp < 20);
+  assert.equal(a.mp, 4);
+  assert.equal(a.hp, 20);
+  const line = Object.assign({}, c.weapons.storm, { map: { shape: 'line', size: 3 } });
+  assert.equal(R.mapArea(b, a, line, { x: 1, y: 0 }).length, 3);
+  assert.equal(R.mapCenters(b, a, line).length, 2);
+});
+
+test('AI 會用地圖兵器與精神指令', () => {
+  const c = mini3();
+  c.weapons.storm = { name: '風暴', type: 'anima', dmg: 'mag', mt: 8, hit: 100, range: [1, 3], map: { shape: 'burst', size: 1 } };
+  c.units.e.weapons = ['axe', 'storm']; c.units.e.stats.mag = 6;
+  c.units.e.spirits = ['valor', 'iron_wall']; c.units.e.sp = 60;
+  const b = B.createBattle(c, 'c', { seed: 1 });
+  const [a, e] = b.units;
+  B.addUnit(b, { unit: 'h', team: 'player', x: 1, y: 0 });
+  B.addUnit(b, { unit: 'k', team: 'player', x: 0, y: 1 });
+  const p = AI.plan(b, e);
+  assert.ok(p.map, JSON.stringify(p));
+  e.boss = true;
+  const sp = AI.pickSpirits(b, e, { x: 1, y: 1, target: a.uid });
+  assert.ok(sp.includes('iron_wall'));
+});
+
+test('支援：鄰近累積支援值、支援對話升級、範圍內加成', () => {
+  const c = mini3();
+  c.scripts.sup_c = [{ cmd: 'say', who: 'a', text: 'C' }];
+  c.supports = { a_h: { a: 'a', b: 'h', ranks: [{ rank: 'C', need: 2, script: 'sup_c' }, { rank: 'B', need: 5 }] } };
+  const b = B.createBattle(c, 'c', { seed: 1 });
+  const [a, e] = b.units;
+  const h = B.addUnit(b, { unit: 'h', team: 'player', x: 1, y: 0 });
+  e.x = 5; e.y = 3;
+  B.startPhase(b, 'player');
+  assert.equal(B.supportTargets(b, a).length, 0);
+  B.startPhase(b, 'player');
+  assert.deepEqual(B.supportTargets(b, a).map((u) => u.uid), [h.uid]);
+  const before = R.combatSide(b, a, e, a, { x: 0, y: 1 });
+  B.supportTalk(b, a, h);
+  assert.equal(R.supportRank(b, 'a', 'h'), 'C');
+  assert.ok(b.queue.includes('sup_c'));
+  e.x = 0; e.y = 1;
+  const fc = R.forecast(b, a, e).att;
+  assert.ok(fc.tags.some((t) => t.startsWith('支援')));
+  assert.equal(B.supportTargets(b, a).length, 0);
+});
+
+test('視野：只看得到我方附近的格子', () => {
+  const c = mini3();
+  const b = B.createBattle(c, 'c', { seed: 1 });
+  const vis = R.visibleTiles(b, 'player');
+  assert.ok(vis.has('0,0') && vis.has('3,0'));
+  assert.ok(!vis.has('7,3'));
+});
+
+test('出擊準備：候選、強制出擊、配置、商店與輸送隊', () => {
+  const c = loadDemo();
+  const roster = {};
+  const info = P.deployInfo(c, 'ch3', roster, { kit_joined: true });
+  assert.ok(info.candidates.find((x) => x.id === 'alan').forced);
+  const sel = P.defaultSelection(info);
+  assert.ok(sel.includes('alan'));
+  const dep = P.assignSlots(info, sel.filter((id) => id !== 'rook'));
+  assert.ok(!dep.some((d) => d.unit === 'rook'));
+  const b = B.createBattle(c, 'ch3', { roster, deploy: dep, seed: 1 });
+  assert.ok(!b.units.some((u) => u.id === 'rook'));
+  const party = { roster, convoy: [], gold: 1000 };
+  assert.equal(P.buy(c, party, 'vulnerary', 'alan').price, 300);
+  assert.equal(party.gold, 700);
+  assert.equal(P.buy(c, party, 'elixir', null).error, '金錢不足');
+  const n = party.roster.alan.items.length;
+  P.toConvoy(c, party, 'alan', 'item', n - 1);
+  assert.equal(party.convoy.length, 1);
+  P.fromConvoy(c, party, 'mira', 0);
+  assert.ok(party.roster.mira.items.some((i) => i.id === 'vulnerary'));
+  const s = P.sell(c, party, 'mira', 'item', party.roster.mira.items.length - 1);
+  assert.ok(s.price > 0);
 });

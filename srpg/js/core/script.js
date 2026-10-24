@@ -10,6 +10,8 @@
      spawn    {units:[placement...]}                    增援（戰鬥中）
      recruit  {unit}                                    說服加入我方
      give     {unit, weapon | item}                     給予武器或道具
+     gold     {add}                                     增減軍資金
+     learn    {unit, skill}                             學會被動技能
      end                                                結束本段劇本
    用法：r = createRunner(campaign, id, ctx); 反覆呼叫 r.next() 取得要顯示的步驟，
         遇到 choice 時呼叫 r.choose(i) 後再 next()。 */
@@ -68,6 +70,8 @@
           case 'spawn': if (ctx.spawn) ctx.spawn(cmd.units || []); break;
           case 'recruit': if (ctx.recruit) ctx.recruit(cmd.unit); break;
           case 'give': if (ctx.give) ctx.give(cmd.unit, cmd.weapon || cmd.item); break;
+          case 'gold': if (ctx.gold) ctx.gold(cmd.add || 0); break;
+          case 'learn': if (ctx.learn) ctx.learn(cmd.unit, cmd.skill); break;
           case 'end': pc = lines.length; break;
           default: if (ctx.custom) ctx.custom(cmd);
         }
