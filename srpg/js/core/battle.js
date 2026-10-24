@@ -264,11 +264,17 @@
     return u;
   }
 
+  function give(b, unitId, weaponId) {
+    const u = b.units.find((x) => x.id === unitId && x.hp > 0);
+    if (u && b.campaign.weapons[weaponId]) u.weapons.push(weaponId);
+    return u;
+  }
+
   SRPG.battle = {
     PHASES, PHASE_NAMES, createBattle, attach, serialize, restore, addUnit, living, byUid,
     fire, hasEvent, moveUnit, undoMove, autoEquip, targetsFrom, previewAttack, actionsFor,
     attack, talk, visit, seize, wait, startPhase, endPhase, phaseDone, checkOutcome,
-    objectiveText, commitRoster, spawn, recruit,
+    objectiveText, commitRoster, spawn, recruit, give,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = SRPG;
 })(typeof window !== 'undefined' ? window : globalThis);
