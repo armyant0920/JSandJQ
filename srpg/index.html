@@ -14,6 +14,7 @@
     <span class="pill" id="objective">—</span>
     <span class="pill" id="goldInfo" hidden>💰 0</span>
     <span class="sp"></span>
+    <span id="zoomCtl"><button class="btn" id="btnZoomOut" title="縮小">－</button><button class="btn" id="btnZoomFit" title="符合畫面">⤢</button><button class="btn" id="btnZoomIn" title="放大">＋</button></span>
     <button class="btn" id="btnDanger" title="顯示所有敵人的攻擊範圍 (D)">⚠ 危險範圍</button>
     <button class="btn" id="btnEnd" title="結束我方回合 (E)">⏭ 結束回合</button>
     <button class="btn" id="btnMenu" title="選單 (M)">☰ 選單</button>
@@ -45,6 +46,7 @@
       <button class="btn primary" id="btnNew">新遊戲</button>
       <button class="btn" id="btnLoad">讀取存檔</button>
       <button class="btn" id="btnImportSave">匯入存檔檔案…</button>
+      <button class="btn" id="btnSettings">⚙ 設定</button>
       <a class="btn" href="editor.html" style="text-decoration:none">🛠 開啟編輯器</a>
     </div>
     <p style="font-size:12px">操作：點選/方向鍵移動游標，Enter/Z 確定，Esc/X/右鍵 取消，E 結束回合，D 危險範圍</p>
@@ -52,11 +54,13 @@
   <div class="screen" id="slotScreen"></div>
   <div class="screen" id="endScreen"></div>
   <div class="screen" id="prepScreen"></div>
+  <div class="screen" id="settingsScreen"></div>
   <input type="file" id="fileCampaign" accept=".json,application/json" hidden>
   <input type="file" id="fileSave" accept=".json,application/json" hidden>
 </div>
 
 <script src="js/core/util.js"></script>
+<script src="js/core/media.js"></script>
 <script src="js/core/campaign.js"></script>
 <script src="js/core/rules.js"></script>
 <script src="js/core/battle.js"></script>
@@ -66,6 +70,8 @@
 <script src="js/core/prep.js"></script>
 <script src="js/render/sprites.js"></script>
 <script src="js/render/renderer.js"></script>
+<script src="js/render/scene.js"></script>
+<script src="js/audio/sound.js"></script>
 <script src="data/demo-campaign.js"></script>
 <script src="js/ui/ui.js"></script>
 <script src="js/ui/prep.js"></script>

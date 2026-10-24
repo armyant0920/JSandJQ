@@ -2,6 +2,8 @@
 (function () {
   'use strict';
   const { campaign: C, rules: R, battle: B, ai: AI, script: S, save: SV, util: U, renderer: RD, sprites: SP, UI } = SRPG;
+  const SND = SRPG.sound, SET = SRPG.settings;
+  const speed = () => SET.get('speed') || 1;
   const $ = (id) => document.getElementById(id);
   const TS = RD.TS;
   const CUSTOM_KEY = 'srpg_campaign_custom';
@@ -39,6 +41,7 @@
     if (errs.length) console.warn('劇本檢查：', errs);
     SP.tag(c);
     G.campaign = c; G.source = source;
+    SND.setCampaign(c);
     $('campaignDesc').textContent = `${c.meta.title}${c.meta.author ? '　／ ' + c.meta.author : ''}${c.meta.desc ? '　— ' + c.meta.desc : ''}`;
     return errs;
   }
@@ -57,6 +60,29 @@
     const b = G.battle;
     if (!b) return;
     canvas.width = b.map.w * TS; canvas.height = b.map.h * TS;
+    applyZoom();
+  }
+
+  /* 地圖縮放：0 = 符合畫面，其餘為倍率；鏡頭跟隨 */
+  const ZOOMS = [0, 0.75, 1, 1.25, 1.5, 2];
+  function applyZoom() {
+    const z = SET.get('zoom') || 0;
+    canvas.classList.toggle('zoomed', z > 0);
+    canvas.style.width = z > 0 ? Math.round(canvas.width * z) + 'px' : '';
+  }
+  function zoomStep(d) {
+    const i = Math.max(0, ZOOMS.indexOf(SET.get('zoom') || 0));
+    let z = ZOOMS[Math.max(0, Math.min(ZOOMS.length - 1, i + d))];
+    if (z === 0 && d > 0) z = 1;
+    SET.set('zoom', z); applyZoom();
+  }
+  function ensureVisible(x, y) {
+    const st = $('stage'), r = canvas.getBoundingClientRect(), sr = st.getBoundingClientRect();
+    const k = r.width / canvas.width;
+    const px = r.left + (x + 0.5) * TS * k, py = r.top + (y + 0.5) * TS * k;
+    const m = TS * k * 1.5;
+    if (px < sr.left + m || px > sr.right - m) st.scrollLeft += px - (sr.left + sr.width / 2);
+    if (py < sr.top + m || py > sr.bottom - m) st.scrollTop += py - (sr.top + sr.height / 2);
   }
 
   function unitPixel(u) {
@@ -147,7 +173,7 @@
   function animateMove(u, path) {
     if (!path || path.length < 2) return Promise.resolve();
     return new Promise((resolve) => {
-      const per = 70; const t0 = performance.now();
+      const per = 70 / speed(); const t0 = performance.now();
       G.anim = { uid: u.uid, pos: { x: path[0].x * TS, y: path[0].y * TS } };
       const step = (now) => {
         const f = Math.max(0, (now - t0) / per);
@@ -167,7 +193,7 @@
       const t0 = performance.now();
       G.anim = { uid: u.uid, pos: { x: u.x * TS, y: u.y * TS } };
       const step = (now) => {
-        const f = Math.max(0, (now - t0) / 260);
+        const f = Math.max(0, (now - t0) / (260 / speed()));
         const k = Math.sin(Math.min(1, f) * Math.PI) * 12;
         G.anim.pos = { x: u.x * TS + dx * k, y: u.y * TS + dy * k };
         if (f >= 1) { G.anim = null; resolve(); } else requestAnimationFrame(step);
@@ -248,10 +274,20 @@
       B.fire(G.battle, 'start');
       await drainQueue();
       B.startPhase(G.battle, 'player');
+      playPhaseBgm();
+      UI.sfx('phase');
       await UI.banner(B.PHASE_NAMES.player, '第 1 回合', '#8fb4ff');
       await drainQueue();
     }
+    if (restoreBattle) playPhaseBgm();
     await afterAction();
+  }
+
+  function playPhaseBgm() {
+    const b = G.battle;
+    if (!b) return;
+    const bg = b.chapter.bgm || {};
+    SND.bgm(b.phase === 'player' ? (bg.player || 'bgm_player') : (bg.enemy || 'bgm_enemy'));
   }
 
   // 每個行動後的共通檢查：事件、勝敗、回合自動結束
@@ -261,7 +297,7 @@
     if (b.status === 'victory') return chapterClear();
     if (b.status === 'defeat') return gameOver();
     if (b.phase === 'player') {
-      if (B.phaseDone(b)) return endPlayerPhase();
+      if (B.phaseDone(b) && SET.get('autoEnd') !== false) return endPlayerPhase();
       G.mode = 'idle';
       updateHud();
     }
@@ -276,6 +312,8 @@
       B.endPhase(b);
       updateHud();
       const color = { player: '#8fb4ff', enemy: '#ff9a9a', ally: '#8ee6a8' }[b.phase];
+      playPhaseBgm();
+      UI.sfx('phase');
       await UI.banner(B.PHASE_NAMES[b.phase], '第 ' + b.turn + ' 回合', color);
       await drainQueue();
       if (b.status !== 'playing') break;
@@ -292,10 +330,10 @@
     for (const u of order) {
       if (u.hp <= 0 || u.acted || b.status !== 'playing') continue;
       const plan = AI.plan(b, u);
-      if (visible(u)) G.cursor = { x: u.x, y: u.y };
+      if (visible(u)) { G.cursor = { x: u.x, y: u.y }; ensureVisible(u.x, u.y); }
       for (const sid of AI.pickSpirits(b, u, plan)) {
         const r = B.useSpirit(b, u, sid);
-        if (!r.error && visible(u)) { fx(u.x, u.y, G.campaign.spirits[sid].name, '#ff9ae8'); await UI.sleep(350); }
+        if (!r.error && visible(u)) { UI.sfx('spirit'); fx(u.x, u.y, G.campaign.spirits[sid].name, '#ff9ae8'); await UI.sleep(350); }
       }
       if (plan.x !== u.x || plan.y !== u.y) {
         const path = B.moveUnit(b, u, plan.x, plan.y);
@@ -327,6 +365,7 @@
     const res = B.heal(G.battle, u, t);
     if (!res) return B.wait(G.battle, u);
     await lunge(u, t);
+    UI.sfx('heal');
     fx(t.x, t.y, '+' + res.amount, '#5ae07a');
     await UI.sleep(450);
     await showGains(res);
@@ -337,6 +376,7 @@
     const def = G.campaign.items[(u.items[idx] || {}).id] || {};
     const r = B.useItem(G.battle, u, idx);
     if (!r) return;
+    UI.sfx('heal');
     fx(u.x, u.y, (def.name || '') + ' ' + r.text, '#5ae07a');
     await UI.sleep(600);
     updateHud();
@@ -348,24 +388,48 @@
     const res = B.attack(b, u, t, weaponIdx);
     const finals = { [u.uid]: u.hp, [t.uid]: t.hp };
     u.hp = before[u.uid]; t.hp = before[t.uid];
+    if (wantScene(u, t, res.combat)) {
+      await SRPG.scene.play({ campaign: G.campaign, att: u, def: t, fc: res.combat.fc, strikes: res.combat.strikes, terrain: b.map.tiles[t.y][t.x], speed: speed() });
+      u.hp = finals[u.uid]; t.hp = finals[t.uid];
+      for (const d of res.deaths) fx(d.x, d.y, '擊破', '#ffffff');
+      await showGains(res);
+      updateHud();
+      return;
+    }
     for (const s of res.combat.strikes) {
       const by = B.byUid(b, s.by), tg = B.byUid(b, s.target);
       await lunge(by, tg);
       tg.hp = s.hpAfter;
+      UI.sfx(s.hit ? (s.crit ? 'crit' : 'hit') : 'miss');
       if (s.evaded) fx(tg.x, tg.y, '閃避！', '#ff9ae8');
       else if (!s.hit) fx(tg.x, tg.y, 'MISS', '#cfd6e0');
       else fx(tg.x, tg.y, (s.crit ? '必殺！' : '') + '-' + s.dmg, s.crit ? '#ffd24a' : '#ff6464');
+      if (s.skills && s.skills.length) fx(by.x, by.y - 0.6, s.skills.join('・'), '#9fd8ff');
       updateCards();
-      await UI.sleep(380);
+      await UI.sleep(380 / speed());
     }
     u.hp = finals[u.uid]; t.hp = finals[t.uid];
     for (const d of res.deaths) {
       G.fx.push({ dying: true, unit: d, t0: performance.now() });
       fx(d.x, d.y, '擊破', '#ffffff');
     }
-    if (res.deaths.length) await UI.sleep(500);
+    if (res.deaths.length) { UI.sfx('death'); await UI.sleep(500); }
     await showGains(res);
     updateHud();
+  }
+
+  // 戰鬥演出設定：on 全部播放 / special 只播有頭像切入的必殺演出 / off 關閉
+  function wantScene(u, t, combat) {
+    const mode = SET.get('scene') || 'on';
+    if (mode === 'off' || !SRPG.scene) return false;
+    if (G.vis && (!visible(u) || !visible(t))) return false;
+    if (mode === 'on') return true;
+    return combat.strikes.some((s) => {
+      const side = s.by === u.uid ? combat.fc.att : combat.fc.def;
+      const w = side && G.campaign.weapons[side.weaponId];
+      const an = w && G.campaign.animations[SRPG.media.animFor(G.campaign, Object.assign({ id: side.weaponId }, w))];
+      return an && an.cutin;
+    });
   }
 
   async function doMapAttack(u, wi, at) {
@@ -377,12 +441,14 @@
     if (!res) return B.wait(b, u);
     const finals = new Map(victims.map((v) => [v.uid, v.hp]));
     for (const v of victims) v.hp = before.get(v.uid);
+    UI.sfx('magic');
     await UI.banner(w.name || '地圖兵器', u.name, '#ffb44a', 700);
     G.flash = { tiles: res.area, t0: performance.now() };
     await UI.sleep(400);
     for (const st of res.strikes) {
       const tg = B.byUid(b, st.target);
       tg.hp = st.hpAfter;
+      UI.sfx(st.hit ? (st.crit ? 'crit' : 'hit') : 'miss');
       if (st.evaded) fx(tg.x, tg.y, '閃避！', '#ff9ae8');
       else if (!st.hit) fx(tg.x, tg.y, 'MISS', '#cfd6e0');
       else fx(tg.x, tg.y, (st.crit ? '必殺！' : '') + '-' + st.dmg, st.crit ? '#ffd24a' : '#ff6464');
@@ -414,6 +480,7 @@
   async function chapterClear() {
     const b = G.battle;
     G.mode = 'busy';
+    SND.stopBgm(); UI.sfx('victory');
     await UI.banner('勝利！', b.chapter.name, '#ffd24a', 1400);
     B.commitRoster(b, G.roster);
     G.supports = U.clone(b.supports || {});
@@ -426,6 +493,7 @@
 
   function gameOver() {
     G.mode = 'busy';
+    SND.stopBgm(); UI.sfx('defeat');
     const el = $('endScreen');
     el.innerHTML = `<h1 style="color:#ff6464">GAME OVER</h1><p>${UI.esc(G.battle.chapter.name || '')}</p>
       <div class="col"><button class="btn primary" id="btnRetry">重新挑戰本章</button><button class="btn" id="btnToTitle">回到標題</button></div>`;
@@ -523,10 +591,38 @@
   }
 
   /* ================= 標題 ================= */
-  function hideScreens() { for (const id of ['titleScreen', 'slotScreen', 'endScreen', 'prepScreen']) UI.screen(id, false); }
+  function hideScreens() { for (const id of ['titleScreen', 'slotScreen', 'endScreen', 'prepScreen', 'settingsScreen']) UI.screen(id, false); }
+
+  /* ================= 設定 ================= */
+  function showSettings() {
+    const el = $('settingsScreen');
+    const s = SET.all();
+    const opt = (k, v, l) => `<option value="${v}" ${String(s[k]) === String(v) ? 'selected' : ''}>${l}</option>`;
+    el.innerHTML = `<h2>⚙ 設定</h2><div class="col card" style="min-width:min(420px,92vw);text-align:left">
+      <label>音效音量 <input type="range" min="0" max="1" step="0.05" value="${s.sfx}" data-k="sfx"></label>
+      <label>BGM 音量 <input type="range" min="0" max="1" step="0.05" value="${s.bgm}" data-k="bgm"></label>
+      <label>戰鬥演出 <select data-k="scene">${opt('scene', 'on', '全部播放')}${opt('scene', 'special', '只播必殺技')}${opt('scene', 'off', '關閉')}</select></label>
+      <label>動畫速度 <select data-k="speed">${opt('speed', 1, '1×')}${opt('speed', 1.5, '1.5×')}${opt('speed', 2, '2×')}${opt('speed', 3, '3×')}</select></label>
+      <label>全員行動後自動結束回合 <input type="checkbox" data-k="autoEnd" ${s.autoEnd !== false ? 'checked' : ''}></label>
+      <button class="btn" id="btnTestSfx">🔊 試聽音效</button>
+      <button class="btn primary" id="btnSetClose">完成</button></div>`;
+    UI.screen('settingsScreen');
+    el.querySelectorAll('[data-k]').forEach((inp) => (inp.oninput = inp.onchange = () => {
+      const k = inp.dataset.k;
+      SET.set(k, inp.type === 'checkbox' ? inp.checked : inp.type === 'range' || k === 'speed' ? Number(inp.value) : inp.value);
+    }));
+    $('btnTestSfx').onclick = () => UI.sfx('crit');
+    $('btnSetClose').onclick = () => UI.screen('settingsScreen', false);
+  }
+  $('btnSettings').onclick = showSettings;
+  $('btnZoomIn').onclick = () => zoomStep(1);
+  $('btnZoomOut').onclick = () => zoomStep(-1);
+  $('btnZoomFit').onclick = () => { SET.set('zoom', 0); applyZoom(); };
+  $('stage').addEventListener('wheel', (e) => { if (e.ctrlKey) { e.preventDefault(); zoomStep(e.deltaY < 0 ? 1 : -1); } }, { passive: false });
 
   function showTitle() {
     G.battle = null; G.mode = 'title';
+    SND.stopBgm();
     hideScreens();
     UI.screen('titleScreen');
   }
@@ -567,7 +663,9 @@
   function setCursor(x, y) {
     const b = G.battle;
     if (!b) return;
-    G.cursor = { x: U.clamp(x, 0, b.map.w - 1), y: U.clamp(y, 0, b.map.h - 1) };
+    const nx = U.clamp(x, 0, b.map.w - 1), ny = U.clamp(y, 0, b.map.h - 1);
+    if (nx !== G.cursor.x || ny !== G.cursor.y) UI.sfx('cursor');
+    G.cursor = { x: nx, y: ny };
     if (G.mode === 'move' && G.reach) {
       const n = G.reach.get(G.cursor.x + ',' + G.cursor.y);
       G.path = n && n.stop ? R.pathTo(G.reach, G.cursor.x, G.cursor.y) : null;
@@ -721,7 +819,7 @@
         const apply = async (target) => {
           const r = B.useSpirit(b, me, sid, target);
           if (r.error) UI.toast(r.error);
-          else for (const t of r.targets) fx(t.x, t.y, sp.name + (r.text !== sp.name ? ' ' + r.text : ''), '#ff9ae8');
+          else { UI.sfx('spirit'); for (const t of r.targets) fx(t.x, t.y, sp.name + (r.text !== sp.name ? ' ' + r.text : ''), '#ff9ae8'); }
           await UI.sleep(350);
           updateHud();
           if (sp.effect === 'accel' && !r.error) { B.undoMove(me); G.threat = R.threatTiles(b, me); G.reach = G.threat.reach; G.mode = 'move'; setCursor(me.x, me.y); UI.toast('移動力 +' + (sp.value || 3)); return; }
@@ -789,12 +887,14 @@
       { id: 'end', name: '⏭ 結束回合' },
       { id: 'danger', name: (G.dangerAll ? '隱藏' : '顯示') + '危險範圍' },
       { id: 'save', name: '💾 中斷存檔' },
+      { id: 'settings', name: '⚙ 設定' },
       { id: 'title', name: '↩ 回到標題' },
     ], pos.x, pos.y);
     G.mode = 'idle';
     if (id === 'end') await endPlayerPhase();
     else if (id === 'danger') G.dangerAll = !G.dangerAll;
     else if (id === 'save') showSaveScreen('中斷存檔', true, null);
+    else if (id === 'settings') showSettings();
     else if (id === 'title' && confirm('回到標題？未存檔的進度會遺失。')) showTitle();
     updateHud();
   }

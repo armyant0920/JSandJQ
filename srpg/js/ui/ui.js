@@ -9,7 +9,9 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
   let keyHandler = null; // 目前攔截鍵盤的 UI 元件
+  const sfx = (id) => { if (SRPG.sound) SRPG.sound.play(id); };
   const UI = { sleep, esc };
+  UI.sfx = sfx;
 
   UI.onKey = function (e) { return keyHandler ? keyHandler(e) !== false : false; };
   UI.busy = () => !!keyHandler;
@@ -67,7 +69,7 @@
       let f = 0;
       const focus = () => btns.forEach((b, i) => b.classList.toggle('focus', i === f));
       focus();
-      const pick = (i) => { box.className = ''; keyHandler = null; resolve(i); };
+      const pick = (i) => { box.className = ''; keyHandler = null; sfx('select'); resolve(i); };
       btns.forEach((b) => (b.onclick = (e) => { e.stopPropagation(); pick(+b.dataset.i); }));
       keyHandler = (e) => {
         if (e.key === 'ArrowDown') { f = (f + 1) % btns.length; focus(); }
@@ -103,7 +105,7 @@
       let f = btns.findIndex((b) => !b.disabled);
       const focus = () => btns.forEach((b, i) => b.classList.toggle('focus', i === f));
       focus();
-      const done = (v) => { layer.innerHTML = ''; keyHandler = null; document.removeEventListener('mousedown', outside, true); resolve(v); };
+      const done = (v) => { layer.innerHTML = ''; keyHandler = null; document.removeEventListener('mousedown', outside, true); sfx(v == null ? 'cancel' : 'select'); resolve(v); };
       const outside = (e) => { if (!m.contains(e.target)) { e.stopPropagation(); e.preventDefault(); done(null); } };
       setTimeout(() => document.addEventListener('mousedown', outside, true), 0);
       btns.forEach((b, i) => (b.onclick = () => done(items[i].id)));
@@ -258,6 +260,7 @@
     el.innerHTML = `<h3>LEVEL UP！</h3><div class="row"><b class="team-${u.team}">${esc(u.name)}</b><span>Lv ${u.level}</span></div>
       <div class="row"><span>HP ${u.stats.hp}${gains.hp ? ' <b style="color:var(--accent)">+' + gains.hp + '</b>' : ''}</span></div>${statsHtml(u, gains)}`;
     el.className = 'card show';
+    sfx('levelup');
     return new Promise((resolve) => {
       const done = () => { el.className = 'card'; el.onclick = null; keyHandler = null; resolve(); };
       el.onclick = done;

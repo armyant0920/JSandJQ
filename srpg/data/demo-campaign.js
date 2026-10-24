@@ -76,6 +76,7 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "price": 3000
   },
   "meteor": {
+   "anim": "special_meteor",
    "name": "流星斬",
    "type": "sword",
    "dmg": "phys",
@@ -182,6 +183,7 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "price": 500
   },
   "thunder": {
+   "anim": "magic_thunder",
    "name": "雷擊",
    "type": "anima",
    "dmg": "mag",

@@ -67,7 +67,7 @@
         el.querySelectorAll('[data-sell]').forEach((b) => (b.onclick = () => { const [k, i] = b.dataset.sell.split(':'); const r = P.sell(c, party, cur, k, +i); UI.toast(r.error || `賣出 +${r.price} 金`); draw(); }));
         el.querySelectorAll('[data-buy],[data-buyc]').forEach((b) => (b.onclick = () => {
           const r = P.buy(c, party, b.dataset.buy || b.dataset.buyc, b.dataset.buy ? cur : null);
-          UI.toast(r.error || `購買 -${r.price} 金`); draw();
+          if (!r.error) UI.sfx('buy'); UI.toast(r.error || `購買 -${r.price} 金`); draw();
         }));
         el.querySelector('[data-go]').onclick = () => { UI.screen('prepScreen', false); resolve(P.assignSlots(info, selected)); };
       };

@@ -146,3 +146,15 @@ button { font-family: inherit; }
 .card .res .bar i { display: block; height: 100%; }
 .card .skills { display: flex; flex-wrap: wrap; gap: 3px; margin: 3px 0; }
 .card .skills span { background: #203a50; color: #9fd8ff; border-radius: 8px; padding: 0 6px; font-size: 11px; }
+
+/* 戰鬥演出 */
+.scene-wrap { position: fixed; inset: 0; z-index: 70; background: #000d; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.scene-wrap canvas { width: min(100vw, calc(100vh * 16 / 9)); height: auto; max-height: 100vh; image-rendering: pixelated; box-shadow: 0 0 40px #000; }
+.scene-hint { position: absolute; right: 14px; bottom: 10px; color: #fff8; font-size: 12px; }
+
+/* 設定 */
+#settingsScreen .col label { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: var(--txt); }
+#settingsScreen input[type=range] { width: 180px; }
+#zoomCtl { display: flex; gap: 4px; }
+#zoomCtl .btn { padding: 4px 9px; }
+#map.zoomed { max-width: none; }

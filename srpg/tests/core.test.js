@@ -7,9 +7,9 @@ const fs = require('fs');
 const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
-for (const f of ['util', 'campaign', 'rules', 'battle', 'ai', 'script', 'save', 'prep']) require(path.join(ROOT, 'js/core', f + '.js'));
+for (const f of ['util', 'media', 'campaign', 'rules', 'battle', 'ai', 'script', 'save', 'prep']) require(path.join(ROOT, 'js/core', f + '.js'));
 const SRPG = globalThis.SRPG;
-const { campaign: C, rules: R, battle: B, ai: AI, script: S, save: SV, util: U, prep: P } = SRPG;
+const { campaign: C, rules: R, battle: B, ai: AI, script: S, save: SV, util: U, prep: P, media: M } = SRPG;
 
 function loadDemo() {
   const ctx = { window: {} };
@@ -577,4 +577,37 @@ test('出擊準備：候選、強制出擊、配置、商店與輸送隊', () =>
   assert.ok(party.roster.mira.items.some((i) => i.id === 'vulnerary'));
   const s = P.sell(c, party, 'mira', 'item', party.roster.mira.items.length - 1);
   assert.ok(s.price > 0);
+});
+
+/* ---------- M6 演出與音效資料 ---------- */
+test('音符解析：音名、升降、拍數、休止符', () => {
+  assert.equal(M.noteFreq('A4'), 440);
+  assert.equal(M.noteFreq('A5'), 880);
+  assert.equal(Math.round(M.noteFreq('C4')), 262);
+  assert.equal(M.noteFreq('C#4'), M.noteFreq('Db4'));
+  const n = M.parseNotes('C4 E4:0.5 R:2');
+  assert.equal(n.length, 3); assert.equal(n[1].beats, 0.5); assert.equal(n[2].freq, null);
+  assert.throws(() => M.parseNotes('H4'), /看不懂/);
+});
+
+test('預設音效與 BGM 皆可解析、劇本會補上預設', () => {
+  const c = loadDemo();
+  assert.ok(c.sounds.hit && c.sounds.bgm_player);
+  for (const [id, s] of Object.entries(c.sounds)) assert.ok(M.soundDuration(s) > 0, id);
+  assert.deepEqual(C.validate(c), []);
+});
+
+test('演出：武器對應、時間軸計算', () => {
+  const c = loadDemo();
+  assert.equal(M.animFor(c, { type: 'bow' }), 'arrow');
+  assert.equal(M.animFor(c, { type: 'sword', anim: 'special_meteor' }), 'special_meteor');
+  const tl = M.timeline({ steps: [{ type: 'move', ms: 100 }, { type: 'particles', ms: 300, with: true }, { type: 'hit' }, { type: 'wait', ms: 50 }] });
+  assert.deepEqual(tl.steps.map((s) => s.start), [0, 0, 300, 300]);
+  assert.equal(tl.total, 350);
+  const tl2 = M.timeline({ steps: [{ type: 'tint', ms: 1000, async: true }, { type: 'cutin', ms: 300, with: true }, { type: 'hit' }] });
+  assert.equal(tl2.steps[2].start, 300);
+  assert.equal(tl2.total, 1000);
+  for (const [id, an] of Object.entries(c.animations)) assert.ok(an.steps.some((s) => s.type === 'hit'), id + ' 缺少 hit');
+  const sc = M.sceneFor(c, 'forest');
+  assert.equal(sc.deco, 'trees');
 });

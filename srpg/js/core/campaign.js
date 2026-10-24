@@ -66,6 +66,11 @@
     c.items = Object.assign({}, clone(BASE_ITEMS), c.items || {});
     c.skills = Object.assign({}, clone(BASE_SKILLS), c.skills || {});
     c.supports = c.supports || {};
+    if (SRPG.media) {
+      c.sounds = Object.assign({}, clone(SRPG.media.BASE_SOUNDS), c.sounds || {});
+      c.animations = Object.assign({}, clone(SRPG.media.BASE_ANIMATIONS), c.animations || {});
+    }
+    c.scenes = c.scenes || {};
     for (const k of ['weapons', 'classes', 'units', 'sprites', 'portraits', 'chapters', 'scripts']) c[k] = c[k] || {};
     if (!c.meta.start) c.meta.start = Object.keys(c.chapters)[0] || null;
     return c;
@@ -87,6 +92,17 @@
     for (const [id, cl] of Object.entries(c.classes)) for (const sk of cl.skills || []) if (!c.skills[sk]) errs.push(`職業 ${id} 的技能 ${sk} 不存在`);
     for (const [id, sk] of Object.entries(c.skills)) {
       if (!SRPG.rules || !SRPG.rules.SKILL_EFFECTS[sk.effect]) errs.push(`技能 ${id} 的效果 ${sk.effect} 不存在`);
+    }
+    for (const [id, w] of Object.entries(c.weapons)) if (w.anim && c.animations && !c.animations[w.anim]) errs.push(`武器 ${id} 的演出 ${w.anim} 不存在`);
+    for (const [id, an] of Object.entries(c.animations || {})) {
+      for (const st of an.steps || []) if (st.type === 'sound' && c.sounds && !c.sounds[st.id]) errs.push(`演出 ${id} 的音效 ${st.id} 不存在`);
+    }
+    for (const [id, snd] of Object.entries(c.sounds || {})) {
+      if (snd.type === 'bgm') for (const tr of snd.tracks || []) { try { SRPG.media.parseNotes(tr.notes); } catch (e) { errs.push(`BGM ${id}：${e.message}`); } }
+    }
+    for (const [id, ch] of Object.entries(c.chapters)) for (const k of ['player', 'enemy']) {
+      const b = ch.bgm && ch.bgm[k];
+      if (b && c.sounds && !c.sounds[b]) errs.push(`章節 ${id} 的 BGM ${b} 不存在`);
     }
     for (const [id, sp] of Object.entries(c.supports)) {
       if (!c.units[sp.a] || !c.units[sp.b]) errs.push(`支援 ${id} 的角色不存在`);
