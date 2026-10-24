@@ -104,27 +104,31 @@
     return id ? campaign.sprites[id] : null;
   }
 
-  // 畫單位（px,py 為像素座標）
+  // 畫單位（px,py 為像素座標）。opts: { gray, still, hp, dir }
   function drawUnit(ctx, campaign, u, px, py, t, opts) {
     opts = opts || {};
     const sp = spriteFor(campaign, u);
     const n = SP.frameCount(sp);
-    const bob = opts.still ? 0 : Math.round(Math.sin((t || 0) / 300 + (u.uid || 0)) * 1.5);
-    const fi = n > 1 ? Math.floor((t || 0) / 400 + (u.uid || 0)) % n : 0;
+    const isImg = sp && sp.image;
+    const bob = opts.still || isImg ? 0 : Math.round(Math.sin((t || 0) / 300 + (u.uid || 0)) * 1.5);
+    const fi = opts.still ? (isImg ? 1 : 0) : (n > 1 ? Math.floor((t || 0) / (isImg ? 220 : 400) + (u.uid || 0)) % n : 0);
+    const tc = SP.TEAM_COLORS[u.team] || SP.TEAM_COLORS.none;
     ctx.save();
     if (opts.gray) ctx.filter = 'grayscale(1) brightness(0.8)';
-    // 陰影
+    // 陣營底座（圖片角色不會換色，靠底座辨識敵我）
     ctx.fillStyle = 'rgba(0,0,0,0.25)';
-    ctx.beginPath(); ctx.ellipse(px + TS / 2, py + TS - 6, TS * 0.3, 5, 0, 0, Math.PI * 2); ctx.fill();
-    const flip = u.team === 'enemy';
-    const s = TS - 6;
-    ctx.translate(px + TS / 2, py + 3 + bob);
+    ctx.beginPath(); ctx.ellipse(px + TS / 2, py + TS - 7, TS * 0.34, 6, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = tc.team; ctx.lineWidth = 2.5;
+    ctx.beginPath(); ctx.ellipse(px + TS / 2, py + TS - 7, TS * 0.34, 6, 0, 0, Math.PI * 2); ctx.stroke();
+    const flip = !isImg && u.team === 'enemy';
+    const s = TS - 4;
+    ctx.translate(px + TS / 2, py + 1 + bob);
     if (flip) ctx.scale(-1, 1);
-    const ok = sp && SP.draw(ctx, sp, fi, u.team, -s / 2, 0, s, s, 0);
+    const dir = opts.dir != null ? opts.dir : (u.dir != null ? u.dir : 0);
+    const ok = sp && SP.draw(ctx, sp, fi, u.team, -s / 2, -2, s, s, dir);
     if (!ok) {
-      const tc = SP.TEAM_COLORS[u.team] || SP.TEAM_COLORS.none;
       ctx.fillStyle = tc.team; ctx.strokeStyle = tc.teamDark; ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(0, s / 2, s * 0.38, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, s / 2, s * 0.36, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
       if (flip) ctx.scale(-1, 1);
       ctx.fillStyle = '#fff'; ctx.font = 'bold 18px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText((u.name || '?').slice(0, 1), 0, s / 2);
@@ -132,13 +136,17 @@
     ctx.restore();
     if (opts.hp !== false && u.stats) {
       const w = TS - 12, ratio = Math.max(0, u.hp / u.stats.hp);
-      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(px + 6, py + TS - 6, w, 4);
+      ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.fillRect(px + 6, py + TS - 4, w, 4);
       ctx.fillStyle = ratio > 0.5 ? '#5ae07a' : ratio > 0.25 ? '#ffd24a' : '#ff5a5a';
-      ctx.fillRect(px + 6, py + TS - 6, Math.round(w * ratio), 4);
+      ctx.fillRect(px + 6, py + TS - 4, Math.round(w * ratio), 4);
     }
     if (u.boss) {
-      ctx.fillStyle = '#ffd24a'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillStyle = '#ffd24a'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
       ctx.fillText('★', px + 2, py + 1);
+    }
+    if (u.buffs && Object.keys(u.buffs).length) {
+      ctx.fillStyle = '#ff9ae8'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+      ctx.fillText('◆', px + TS - 2, py + 1);
     }
   }
 

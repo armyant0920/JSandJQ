@@ -4,7 +4,37 @@
   const { h } = ED;
   const C = SRPG.campaign;
   const MOVE_TYPES = [['foot', '步行'], ['horse', '騎馬'], ['armor', '重甲'], ['fly', '飛行']];
-  const WTYPES = [['sword', '劍'], ['lance', '槍'], ['axe', '斧'], ['bow', '弓'], ['anima', '理魔法'], ['light', '光魔法'], ['dark', '闇魔法'], ['other', '其他']];
+  const WTYPES = [['sword', '劍'], ['lance', '槍'], ['axe', '斧'], ['bow', '弓'], ['anima', '理魔法'], ['light', '光魔法'], ['dark', '闇魔法'], ['staff', '杖（治療）'], ['other', '其他']];
+  const ITEM_KINDS = [['heal', '回復 HP'], ['boost', '永久提升能力'], ['sp', '回復 SP'], ['morale', '提升氣力']];
+  const SPIRIT_TARGETS = [['self', '自己'], ['ally', '指定同伴'], ['allies', '全體同伴']];
+
+  // 圖示：顯示 + 點擊開啟選擇器
+  function iconCell(i) { return h('span', { style: SRPG.sprites.iconStyle(i, 24) }); }
+  function iconPicker(obj, key) {
+    return h('span.row', {}, obj[key] != null ? iconCell(obj[key]) : h('span.hint', {}, '（無）'),
+      h('button', { onclick: () => {
+        const img = h('img', { src: 'assets/icons.png', style: { width: '512px', imageRendering: 'pixelated', cursor: 'pointer', background: '#223' } });
+        img.onclick = (e) => {
+          const r = img.getBoundingClientRect();
+          const c = Math.floor((e.clientX - r.left) / r.width * 16), rr = Math.floor((e.clientY - r.top) / r.height * 19);
+          obj[key] = rr * 16 + c; ED.closeModal(); ED.dirty(true);
+        };
+        ED.modal('選擇圖示（assets/icons.png）', h('div', {}, img), [{ label: '清除圖示', onclick: () => { delete obj[key]; ED.dirty(true); } }]);
+      } }, '選擇…'));
+  }
+  ED.iconPicker = iconPicker;
+  // 可重複的 id 清單編輯（道具可以帶多個）
+  function idList(obj, key, group, multi) {
+    obj[key] = obj[key] || [];
+    return h('div.chips', {}, ...ED.keys(group).map((id) => {
+      const d = ED.c[group][id];
+      const n = obj[key].filter((x) => x === id).length;
+      return h('span.chip', { className: 'chip' + (n ? ' on' : ''), title: d.desc || '',
+        onclick: () => { if (n && !multi) obj[key] = obj[key].filter((x) => x !== id); else obj[key] = obj[key].concat(id); ED.dirty(true); },
+        oncontextmenu: (e) => { e.preventDefault(); const i = obj[key].indexOf(id); if (i >= 0) { obj[key].splice(i, 1); ED.dirty(true); } } },
+      d.icon != null ? iconCell(d.icon) : null, (d.name || id) + (multi && n > 1 ? ' ×' + n : ''));
+    }));
+  }
 
   function spritePreview(spId, team, size) {
     const cv = h('canvas.px', { width: size || 64, height: size || 64 });
@@ -28,7 +58,9 @@
         ...ED.formRow('作者', ED.text(m, 'author')),
         ...ED.formRow('簡介', ED.area(m, 'desc', 3)),
         ...ED.formRow('起始章節', ED.select(m, 'start', ED.named('chapters'))),
-        ...ED.formRow('永久死亡', ED.check(m, 'permadeath', '我方陣亡後不再出場（FE 風格）'))),
+        ...ED.formRow('永久死亡', ED.check(m, 'permadeath', '我方陣亡後不再出場（FE 風格）')),
+        ...ED.formRow('氣力系統', ED.check(m.rules = m.rules || {}, 'morale', 'SRW 風格：戰鬥/擊破提升氣力，傷害 × 攻方氣力 / 守方氣力')),
+        ...ED.formRow('精神指令', ED.check(m.rules, 'spirits', 'SRW 風格：消耗 SP 發動必中、熱血、加速等'))),
       h('p.hint', {}, counts),
       h('h2', {}, '使用說明'),
       h('div.hint', { innerHTML: `
@@ -62,10 +94,11 @@
         ...ED.formRow('主角', ED.check(u, 'lord', '主角（陣亡＝敗北、可壓制）')),
         ...ED.formRow('外觀', ED.select(u, 'sprite', ED.keys('sprites'), { optional: true, optionalLabel: '（跟隨職業）', rerender: true })),
         ...ED.formRow('頭像', ED.select(u, 'portrait', ED.keys('portraits').concat(ED.keys('sprites').filter((k) => !ED.c.portraits[k])), { optional: true, rerender: true })),
-        ...ED.formRow('武器', h('div.chips', {}, ...ED.keys('weapons').map((w) => h('span.chip', {
-          className: 'chip' + (u.weapons.includes(w) ? ' on' : ''),
-          onclick: () => { u.weapons = u.weapons.includes(w) ? u.weapons.filter((x) => x !== w) : u.weapons.concat(w); ED.dirty(true); },
-        }, ED.c.weapons[w].name || w))))),
+        ...ED.formRow('武器', idList(u, 'weapons', 'weapons', false)),
+        ...ED.formRow('道具', idList(u, 'items', 'items', true), h('span.hint', {}, '點擊增加，右鍵減少')),
+        ...ED.formRow('SP', ED.num(u, 'sp'), h('span.hint', {}, '精神指令點數（每章回滿）')),
+        ...ED.formRow('初始氣力', ED.num(u, 'morale', { attrs: { placeholder: '100' } })),
+        ...ED.formRow('精神指令', idList(u, 'spirits', 'spirits', false))),
       h('h3', {}, '基礎能力'), stats(u.stats),
       h('h3', {}, '成長率 %（每升一級各項提升的機率）'), stats(u.growth)));
   };
@@ -108,7 +141,53 @@
         ...ED.formRow('命中', ED.num(w, 'hit')),
         ...ED.formRow('必殺', ED.num(w, 'crit')),
         ...ED.formRow('射程', rgIn('min', 0), '～', rgIn('max', 1)),
+        ...ED.formRow('圖示', iconPicker(w, 'icon')),
+        ...(w.type === 'staff' ? ED.formRow('回復量', ED.num(w, 'heal'), h('span.hint', {}, '實際回復 = 魔力 + 回復量')) : []),
+        ...ED.formRow('勇者武器', ED.check(w, 'brave', '每次攻擊連續兩下')),
+        ...ED.formRow('氣力需求', ED.num(w, 'morale', { attrs: { placeholder: '無' } }), h('span.hint', {}, '氣力系統開啟時，氣力不足無法使用（必殺技）')),
+        ...ED.formRow('說明', ED.text(w, 'desc', { optional: true })),
         ...ED.formRow('特效', h('input', { type: 'text', value: (w.effective || []).join(','), placeholder: '例如 fly（對飛行 3 倍威力）', onchange: (e) => { const v = e.target.value.split(',').map((s) => s.trim()).filter(Boolean); if (v.length) w.effective = v; else delete w.effective; ED.dirty(); } })))));
+  };
+
+  /* ---------- 道具 ---------- */
+  ED.tabs.items = function () {
+    const id = ED.sel.items = ED.sel.items && ED.c.items[ED.sel.items] ? ED.sel.items : Object.keys(ED.c.items)[0];
+    const left = ED.listPanel('items', { prefix: 'item', make: () => ({ name: '新道具', kind: 'heal', power: 10, uses: 1 }) });
+    if (!id) return h('div.split', {}, left, h('p.hint', {}, '尚無道具'));
+    const it = ED.c.items[id];
+    return h('div.split', {}, left, h('div', {},
+      h('h2', {}, '道具：' + (it.name || id)),
+      h('div.form', {},
+        ...ED.formRow('ID', ED.idField('items')),
+        ...ED.formRow('名稱', ED.text(it, 'name')),
+        ...ED.formRow('圖示', iconPicker(it, 'icon')),
+        ...ED.formRow('效果', ED.select(it, 'kind', ITEM_KINDS, { rerender: true })),
+        ...(it.kind === 'boost' ? ED.formRow('能力', ED.select(it, 'stat', C.STAT_KEYS.map((k) => [k, C.STAT_NAMES[k]]))) : []),
+        ...ED.formRow('數值', ED.num(it, 'power')),
+        ...ED.formRow('使用次數', ED.num(it, 'uses')),
+        ...ED.formRow('說明', ED.text(it, 'desc', { optional: true }))),
+      h('p.hint', {}, '使用道具會結束該單位的行動。')));
+  };
+
+  /* ---------- 精神指令 ---------- */
+  ED.tabs.spirits = function () {
+    const id = ED.sel.spirits = ED.sel.spirits && ED.c.spirits[ED.sel.spirits] ? ED.sel.spirits : Object.keys(ED.c.spirits)[0];
+    const left = ED.listPanel('spirits', { prefix: 'spirit', make: () => ({ name: '新指令', cost: 10, effect: 'sureHit', target: 'self' }) });
+    if (!id) return h('div.split', {}, left, h('p.hint', {}, '尚無精神指令'));
+    const sp = ED.c.spirits[id];
+    const E = SRPG.rules.EFFECTS;
+    const KIND = { turn: '持續到下個我方回合', once: '用一次就消失', instant: '立即生效' };
+    return h('div.split', {}, left, h('div', {},
+      h('h2', {}, '精神指令：' + (sp.name || id)),
+      h('div.form', {},
+        ...ED.formRow('ID', ED.idField('spirits')),
+        ...ED.formRow('名稱', ED.text(sp, 'name')),
+        ...ED.formRow('SP 消耗', ED.num(sp, 'cost')),
+        ...ED.formRow('效果', ED.select(sp, 'effect', Object.entries(E).map(([k, e]) => [k, `${e.name}（${k}）— ${KIND[e.kind]}`]), { rerender: true })),
+        ...(['accel', 'heal', 'morale', 'sp'].includes(sp.effect) ? ED.formRow('數值', ED.num(sp, 'value')) : []),
+        ...ED.formRow('對象', ED.select(sp, 'target', SPIRIT_TARGETS)),
+        ...ED.formRow('說明', ED.text(sp, 'desc', { optional: true }))),
+      h('p.hint', {}, '劇本資訊頁勾選「精神指令」才會在遊戲中出現；角色頁設定每個人會的指令與 SP。')));
   };
 
   /* ---------- 地形 ---------- */

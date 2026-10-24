@@ -145,7 +145,19 @@
     const groupBtn = (g, l) => h('button', { className: st.group === g ? 'on' : '', onclick: () => { st.group = g; st.frame = 0; ED.render(); } }, l);
     const left = h('div', {}, h('div.row', {}, groupBtn('sprites', '單位/圖塊'), groupBtn('portraits', '頭像')),
       ED.listPanel(st.group, { prefix: st.group === 'portraits' ? 'face' : 'sprite', make: newSprite }),
-      h('div.row', {}, h('button', { onclick: importSheet, title: '匯入整張圖片當精靈（例如 RPG Maker 行走圖）' }, '🖼 匯入圖片精靈')));
+      h('div.row', {}, h('button', { onclick: importSheet, title: '匯入整張圖片當精靈（例如 RPG Maker 行走圖）' }, '🖼 匯入圖片精靈')),
+      h('h3', {}, '內建角色圖（assets/characters.png）'),
+      h('div.row', {}, ...[0, 1, 2, 3, 4, 5, 6, 7].map((i) => {
+        const cv = h('canvas.px', { width: 36, height: 36, title: '加入角色 ' + i, style: { cursor: 'pointer' }, onclick: () => {
+          const sid = ED.newId('sprites', 'chara_' + i);
+          ED.c.sprites[sid] = { name: '角色 ' + i, image: 'assets/characters.png', sheet: 'rpgmaker', index: i, frameW: 36, frameH: 36 };
+          SP.tag(ED.c); st.group = 'sprites'; ED.sel.sprites = sid; ED.dirty(true);
+        } });
+        const sp = { image: 'assets/characters.png', sheet: 'rpgmaker', index: i, frameW: 36, frameH: 36 };
+        const paint = () => SP.draw(cv.getContext('2d'), sp, 1, 'player', 0, 0, 36, 36, 0);
+        if (!paint()) setTimeout(paint, 200);
+        return cv;
+      })));
     const cur = current();
     if (!cur) return h('div.split', {}, left, h('p.hint', {}, '尚無資料，按「＋ 新增」'));
     const { id, sp } = cur;

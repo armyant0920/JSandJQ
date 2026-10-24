@@ -230,10 +230,10 @@ test('名冊：永久死亡的角色下一章不出場', () => {
   assert.ok(!b2.units.some((u) => u.id === 'rook'));
 });
 
-test('示範第一章：雙方全自動對打能正常結束', () => {
+test('示範全章節：雙方全自動對打能正常結束', () => {
   const c = loadDemo();
-  for (const seed of [1, 2, 3, 4, 5]) {
-    const b = B.createBattle(c, 'ch1', { seed });
+  for (const [ch, seed] of [['ch1', 1], ['ch1', 2], ['ch1', 3], ['ch2a', 4], ['ch2b', 5], ['ch3', 6], ['ch3', 7]]) {
+    const b = B.createBattle(c, ch, { seed, flags: { kit_joined: true } });
     B.startPhase(b, 'player');
     let guard = 0;
     while (b.status === 'playing' && guard++ < 400) {
@@ -249,7 +249,7 @@ test('示範第一章：雙方全自動對打能正常結束', () => {
       }
       if (b.status === 'playing') B.endPhase(b);
     }
-    assert.notEqual(b.status, 'playing', 'seed ' + seed + ' 未結束');
+    assert.notEqual(b.status, 'playing', ch + ' seed ' + seed + ' 未結束');
   }
 });
 

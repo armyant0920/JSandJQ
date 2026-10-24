@@ -6,13 +6,13 @@
   'use strict';
   const { h } = ED;
   const C = SRPG.campaign;
-  const GROUPS = ['meta', 'terrains', 'weapons', 'classes', 'units', 'sprites', 'portraits', 'chapters', 'scripts'];
+  const GROUPS = ['meta', 'terrains', 'weapons', 'items', 'spirits', 'classes', 'units', 'sprites', 'portraits', 'chapters', 'scripts'];
 
   const SCOPES = {
     sprites: { label: '🎨 精靈圖 / 頭像（像素畫）', groups: ['sprites', 'portraits'], ctx: ['classes'] },
     maps: { label: '🗺 地圖與章節', groups: ['chapters'], ctx: ['terrains', 'units', 'scripts'] },
     story: { label: '📜 劇情對話', groups: ['scripts', 'chapters'], ctx: ['units'] },
-    db: { label: '⚖ 角色 / 職業 / 武器數值', groups: ['units', 'classes', 'weapons'], ctx: ['sprites'] },
+    db: { label: '⚖ 角色 / 職業 / 武器 / 道具 / 精神指令', groups: ['units', 'classes', 'weapons', 'items', 'spirits'], ctx: ['sprites'] },
   };
   const TASKS = {
     sprites: '請新增一個 16×16 的單位精靈 `sprite_xxx`：（描述外觀，例如：戴兜帽、拿法杖的白魔道士）。衣服主色用隊伍色 T/t。',
@@ -42,6 +42,11 @@
 - \`weapons\` 武器：{ name, type:sword|lance|axe|bow|anima|light|dark, dmg:phys|mag, mt, hit, crit, range:[最小,最大], effective?:["fly"] }
 - \`classes\` 職業：{ name, move, moveType:foot|horse|armor|fly, sprite, tags? }
 - \`units\` 角色：{ name, class, level, lord?, sprite?, portrait?, stats:{hp,str,mag,skl,spd,lck,def,res}, growth:{同上，百分比}, weapons:[武器id] }
+- \`weapons\` 補充：type 為 "staff" 是治療杖（heal: 回復量，回復 = 魔力 + heal）；brave:true 每次攻擊連打兩下；morale:115 需要氣力 115 才能用；icon: 圖示編號（assets/icons.png，16 欄，編號 = 列×16+欄）
+- \`items\` 道具：{ name, kind:heal|boost|sp|morale, power, stat?(boost 用), uses, icon?, desc }
+- \`spirits\` 精神指令：{ name, cost(SP), effect, value?, target:self|ally|allies, desc }；effect 可用：${Object.entries(SRPG.rules.EFFECTS).map(([k, e]) => k + '(' + e.name + ')').join('、')}
+- \`units\` 另有：items:[道具id]、sp、morale(初始氣力)、spirits:[精神指令id]；sprite 可用 "chara_0"~"chara_7" 等圖片精靈
+- \`meta.rules\`：{ morale:true(氣力系統), spirits:true(精神指令) }
 - \`sprites\` / \`portraits\` 像素圖（見下）
 - \`chapters\` 章節、\`scripts\` 劇本對話（見下）
 - id 只用英數與底線。引用其他資料時用 id。`);
@@ -78,7 +83,7 @@
   {"cmd":"set","flag":"旗標"} 或 {"cmd":"set","flag":"好感","add":1},
   {"cmd":"if","flag":"旗標","goto":"標籤","else":"標籤"}  // 也可加 "gte":2 / "eq":值；flag 前加 ! 表示否定
   {"cmd":"spawn","units":[{"unit":"id","team":"enemy","x":0,"y":0}]},
-  {"cmd":"recruit","unit":"id"}, {"cmd":"give","unit":"id","weapon":"武器id"}, {"cmd":"end"} ]
+  {"cmd":"recruit","unit":"id"}, {"cmd":"give","unit":"id","weapon":"武器id"} 或 {"cmd":"give","unit":"id","item":"道具id"}, {"cmd":"end"} ]
 \`\`\`
 - 沒有角色的人物可用 {"cmd":"say","name":"村長","text":"..."}。
 - 每個 goto / 選項跳轉的標籤都必須存在於同一段劇本。`);

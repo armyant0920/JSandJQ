@@ -126,6 +126,11 @@
         for (const u of Object.values(c.units)) u.weapons = (u.weapons || []).map((w) => (w === a ? b : w));
         eachScriptCmd((cmd) => swap(cmd, 'weapon'));
         break;
+      case 'items':
+        for (const u of Object.values(c.units)) u.items = (u.items || []).map((w) => (w === a ? b : w));
+        eachScriptCmd((cmd) => swap(cmd, 'item'));
+        break;
+      case 'spirits': for (const u of Object.values(c.units)) u.spirits = (u.spirits || []).map((w) => (w === a ? b : w)); break;
       case 'sprites': for (const g of ['classes', 'units', 'terrains']) for (const x of Object.values(c[g])) swap(x, 'sprite'); break;
       case 'portraits': for (const u of Object.values(c.units)) swap(u, 'portrait'); eachScriptCmd((cmd) => swap(cmd, 'portrait')); break;
       case 'scripts': eachChapter((ch) => (ch.events || []).forEach((ev) => swap(ev, 'script'))); break;

@@ -55,7 +55,7 @@
 
   function frameCount(sp) {
     if (!sp) return 0;
-    if (sp.sheet === 'rpgmaker') return 3;
+    if (sp.sheet === 'rpgmaker') return 4; // 0,1,2,1 踏步循環
     if (sp.image && !(sp.frames && sp.frames.length)) return 1;
     return (sp.frames || []).length;
   }
@@ -73,7 +73,8 @@
         const fw = sp.frameW || rec.img.width / 12, fh = sp.frameH || rec.img.height / 8;
         const idx = sp.index || 0;
         const bx = (idx % 4) * 3, by = Math.floor(idx / 4) * 4;
-        return { src: rec.img, sx: (bx + i) * fw, sy: (by + (dir || 0)) * fh, sw: fw, sh: fh };
+        const col = [0, 1, 2, 1][i];
+        return { src: rec.img, sx: (bx + col) * fw, sy: (by + (dir || 0)) * fh, sw: fw, sh: fh };
       }
       const fw = sp.frameW || rec.img.width, fh = sp.frameH || rec.img.height;
       const f = (sp.frames && sp.frames[i]) || [0, 0];
@@ -90,6 +91,47 @@
     if (!f) return false;
     ctx.imageSmoothingEnabled = false;
     ctx.drawImage(f.src, f.sx, f.sy, f.sw, f.sh, x, y, w, h);
+    return true;
+  }
+
+  /* 圖示：icons.png 為 16 欄 × 32px 的圖示表，index = 列 × 16 + 欄 */
+  const ICON_SHEET = 'assets/icons.png', ICON_SIZE = 32, ICON_COLS = 16;
+  function drawIcon(ctx, index, x, y, size) {
+    if (index == null) return false;
+    const rec = loadImage(ICON_SHEET);
+    if (!rec.ready) return false;
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(rec.img, (index % ICON_COLS) * ICON_SIZE, Math.floor(index / ICON_COLS) * ICON_SIZE, ICON_SIZE, ICON_SIZE, x, y, size, size);
+    return true;
+  }
+  // HTML 用：回傳 <span> 的 style 字串
+  function iconStyle(index, size) {
+    if (index == null) return '';
+    const s = size || 20;
+    return `display:inline-block;width:${s}px;height:${s}px;vertical-align:middle;image-rendering:pixelated;` +
+      `background:url(${ICON_SHEET}) -${(index % ICON_COLS) * s}px -${Math.floor(index / ICON_COLS) * s}px / ${ICON_COLS * s}px auto no-repeat;`;
+  }
+
+  // 預先載入劇本用到的所有圖片
+  function preload(campaign) {
+    const srcs = new Set([ICON_SHEET]);
+    for (const g of ['sprites', 'portraits']) for (const sp of Object.values(campaign[g] || {})) if (sp.image) srcs.add(sp.image);
+    return Promise.all([...srcs].map((src) => new Promise((resolve) => {
+      const rec = loadImage(src);
+      if (rec.ready || rec.error) return resolve();
+      rec.img.addEventListener('load', resolve); rec.img.addEventListener('error', resolve);
+    })));
+  }
+
+  // 頭像：圖片類精靈只取上半身放大
+  function drawBust(ctx, sp, team, x, y, w, h) {
+    const f = getFrame(sp, 1, team, 0);
+    if (!f) return false;
+    ctx.imageSmoothingEnabled = false;
+    if (sp.image) {
+      const sh = Math.round(f.sh * 0.62), sw = Math.round(f.sw * 0.8);
+      ctx.drawImage(f.src, f.sx + (f.sw - sw) / 2, f.sy + 1, sw, sh, x, y, w, h);
+    } else ctx.drawImage(f.src, f.sx, f.sy, f.sw, f.sh, x, y, w, h);
     return true;
   }
 
@@ -125,5 +167,5 @@
     ctx.fillText((name || '?').slice(0, 1), x + s / 2, y + s - 2);
   }
 
-  SRPG.sprites = { TEAM_COLORS, gridToCanvas, getFrame, frameCount, draw, tag, invalidate, loadImage, fallbackPortrait, onload: null };
+  SRPG.sprites = { TEAM_COLORS, gridToCanvas, getFrame, frameCount, draw, drawIcon, iconStyle, preload, drawBust, tag, invalidate, loadImage, fallbackPortrait, onload: null };
 })(typeof window !== 'undefined' ? window : globalThis);

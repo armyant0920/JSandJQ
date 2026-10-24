@@ -70,14 +70,15 @@
       RD.tint(ctx, G.threat.atk, 'rgba(255,70,70,0.32)');
       RD.drawPath(ctx, G.path);
     }
-    if (G.mode === 'target' && G.targets) RD.tint(ctx, G.targets.map((u) => u.x + ',' + u.y), 'rgba(255,70,70,0.45)');
+    if (G.mode === 'target' && G.targets) RD.tint(ctx, G.targets.map((u) => u.x + ',' + u.y), G.targetKind === 'attack' ? 'rgba(255,70,70,0.45)' : 'rgba(80,230,140,0.45)');
     // 目標壓制點
     const v = b.chapter.victory || {};
     if (v.type === 'seize') { ctx.strokeStyle = '#ffd24a'; ctx.lineWidth = 3; ctx.strokeRect(v.x * TS + 3, v.y * TS + 3, TS - 6, TS - 6); }
     const units = b.units.filter((u) => u.hp > 0 && !G.hidden.has(u.uid)).sort((a, c) => a.y - c.y);
     for (const u of units) {
       const p = unitPixel(u);
-      RD.drawUnit(ctx, G.campaign, u, p.x, p.y, now, { gray: u.acted && u.team === b.phase });
+      const dir = G.anim && G.anim.uid === u.uid && G.anim.dir != null ? G.anim.dir : undefined;
+      RD.drawUnit(ctx, G.campaign, u, p.x, p.y, now, { gray: u.acted && u.team === b.phase, dir });
     }
     // 死亡淡出
     for (const d of G.fx.filter((f) => f.dying)) {
@@ -87,7 +88,7 @@
       RD.drawUnit(ctx, G.campaign, d.unit, d.unit.x * TS, d.unit.y * TS, now, { still: true, hp: false });
       ctx.globalAlpha = 1;
     }
-    if (['idle', 'move', 'target'].includes(G.mode)) RD.drawCursor(ctx, G.cursor.x, G.cursor.y, now, G.mode === 'target' ? '#ff6464' : '#fff');
+    if (['idle', 'move', 'target'].includes(G.mode)) RD.drawCursor(ctx, G.cursor.x, G.cursor.y, now, G.mode === 'target' ? (G.targetKind === 'attack' ? '#ff6464' : '#5ae07a') : '#fff');
     RD.drawFx(ctx, G.fx.filter((f) => f.text), now);
     G.fx = G.fx.filter((f) => now - f.t0 < 1000 || !f.t0);
   }
@@ -133,6 +134,7 @@
         const i = Math.min(path.length - 1, Math.floor(f));
         const a = path[i], c = path[Math.min(path.length - 1, i + 1)], k = Math.min(1, f - i);
         G.anim.pos = { x: (a.x + (c.x - a.x) * k) * TS, y: (a.y + (c.y - a.y) * k) * TS };
+        if (c !== a) G.anim.dir = c.y > a.y ? 0 : c.x < a.x ? 1 : c.x > a.x ? 2 : 3;
         if (f >= path.length - 1) { G.anim = null; resolve(); } else requestAnimationFrame(step);
       };
       requestAnimationFrame(step);
@@ -166,9 +168,14 @@
       },
       recruit: (id2) => { const u = b && B.recruit(b, id2); if (u) fx(u.x, u.y, '加入我方！', '#8fb4ff'); },
       give: (uid, wid) => {
+        const def = G.campaign.weapons[wid] || G.campaign.items[wid] || {};
         const u = b && B.give(b, uid, wid);
-        if (u) fx(u.x, u.y, '獲得 ' + ((G.campaign.weapons[wid] || {}).name || wid), '#ffd24a');
-        else if (G.roster[uid]) (G.roster[uid].weapons = G.roster[uid].weapons || []).push(wid);
+        if (u) fx(u.x, u.y, '獲得 ' + (def.name || wid), '#ffd24a');
+        else if (G.roster[uid]) {
+          const r = G.roster[uid];
+          if (G.campaign.weapons[wid]) (r.weapons = r.weapons || []).push(wid);
+          else (r.items = r.items || []).push({ id: wid, uses: def.uses || 1 });
+        }
       },
     });
     for (;;) {
@@ -199,6 +206,7 @@
       G.chapterStart = { roster: U.clone(G.roster), flags: U.clone(G.flags) };
       G.battle = B.createBattle(G.campaign, id, { roster: G.roster, flags: G.flags });
     }
+    await SP.preload(G.campaign);
     G.battle.flags = G.flags;
     resetSelection();
     resizeCanvas();
@@ -262,6 +270,8 @@
       }
       const t = plan.target && B.byUid(b, plan.target);
       if (t && t.hp > 0) await doAttack(u, t);
+      else if (plan.heal) await doHeal(u, B.byUid(b, plan.heal));
+      else if (plan.item != null) await doItem(u, plan.item);
       else B.wait(b, u);
       updateHud();
       await drainQueue();
@@ -270,17 +280,46 @@
     }
   }
 
-  async function doAttack(u, t) {
+  async function showGains(res) {
+    const b = G.battle;
+    for (const [uid, e] of Object.entries(res.exp)) {
+      const pu = B.byUid(b, +uid);
+      if (pu && pu.hp > 0) fx(pu.x, pu.y - 0.4, '+' + e + ' EXP', '#8fb4ff');
+    }
+    for (const [uid, ups] of Object.entries(res.levelUps)) for (const g of ups) await UI.levelUp(B.byUid(b, +uid), g);
+  }
+
+  async function doHeal(u, t) {
+    const res = B.heal(G.battle, u, t);
+    if (!res) return B.wait(G.battle, u);
+    await lunge(u, t);
+    fx(t.x, t.y, '+' + res.amount, '#5ae07a');
+    await UI.sleep(450);
+    await showGains(res);
+    updateHud();
+  }
+
+  async function doItem(u, idx) {
+    const def = G.campaign.items[(u.items[idx] || {}).id] || {};
+    const r = B.useItem(G.battle, u, idx);
+    if (!r) return;
+    fx(u.x, u.y, (def.name || '') + ' ' + r.text, '#5ae07a');
+    await UI.sleep(600);
+    updateHud();
+  }
+
+  async function doAttack(u, t, weaponIdx) {
     const b = G.battle;
     const before = { [u.uid]: u.hp, [t.uid]: t.hp };
-    const res = B.attack(b, u, t);
+    const res = B.attack(b, u, t, weaponIdx);
     const finals = { [u.uid]: u.hp, [t.uid]: t.hp };
     u.hp = before[u.uid]; t.hp = before[t.uid];
     for (const s of res.combat.strikes) {
       const by = B.byUid(b, s.by), tg = B.byUid(b, s.target);
       await lunge(by, tg);
       tg.hp = s.hpAfter;
-      if (!s.hit) fx(tg.x, tg.y, 'MISS', '#cfd6e0');
+      if (s.evaded) fx(tg.x, tg.y, '閃避！', '#ff9ae8');
+      else if (!s.hit) fx(tg.x, tg.y, 'MISS', '#cfd6e0');
       else fx(tg.x, tg.y, (s.crit ? '必殺！' : '') + '-' + s.dmg, s.crit ? '#ffd24a' : '#ff6464');
       updateCards();
       await UI.sleep(380);
@@ -291,11 +330,7 @@
       fx(d.x, d.y, '擊破', '#ffffff');
     }
     if (res.deaths.length) await UI.sleep(500);
-    for (const [uid, e] of Object.entries(res.exp)) {
-      const pu = B.byUid(b, +uid);
-      if (pu && pu.hp > 0) fx(pu.x, pu.y - 0.4, '+' + e + ' EXP', '#8fb4ff');
-    }
-    for (const [uid, ups] of Object.entries(res.levelUps)) for (const g of ups) await UI.levelUp(B.byUid(b, +uid), g);
+    await showGains(res);
     updateHud();
   }
 
@@ -433,7 +468,7 @@
 
   /* ================= 玩家操作 ================= */
   function resetSelection() {
-    G.sel = null; G.reach = null; G.threat = null; G.path = null; G.targets = null; G.view = null;
+    G.sel = null; G.reach = null; G.threat = null; G.path = null; G.targets = null; G.view = null; G.targetKind = null; G.targetCb = null;
     UI.closeMenu();
   }
 
@@ -490,10 +525,21 @@
       const t = G.targets.find((o) => o.x === x && o.y === y);
       if (!t) return;
       G.mode = 'busy';
-      const ok = await UI.forecast(B.previewAttack(b, me, t), me, t);
-      if (!ok) { G.mode = 'target'; return; }
-      G.targets = null;
-      await doAttack(me, t);
+      if (G.targetKind === 'attack') {
+        const ws = B.weaponsFor(b, me, U.dist(me, t)).map(({ i, w }) => ({ i, name: w.name || w.id, icon: w.icon }));
+        B.previewAttack(b, me, t);
+        const r = await UI.forecast({ att: me, def: t, campaign: G.campaign, weapons: ws, cur: me.equip, compute: (i) => B.previewAttack(b, me, t, i) });
+        if (!r.ok) { G.mode = 'target'; return; }
+        G.targets = null;
+        await doAttack(me, t, r.weapon);
+      } else if (G.targetKind === 'heal') {
+        G.targets = null;
+        await doHeal(me, t);
+      } else if (G.targetKind === 'spirit') {
+        const cb = G.targetCb; G.targets = null;
+        cb(t);
+        return;
+      }
       resetSelection();
       await afterAction();
     }
@@ -514,12 +560,57 @@
       G.mode = 'move'; setCursor(me.x, me.y);
       return;
     }
+    const menuAt = (list) => UI.menu(list, pos.x, pos.y);
+    const pickTarget = (kind, list, msg) => {
+      G.targets = list; G.targetKind = kind; G.mode = 'target';
+      setCursor(list[0].x, list[0].y);
+      UI.toast(msg);
+    };
     switch (act.id) {
-      case 'attack':
-        G.targets = B.targetsFrom(b, me); G.mode = 'target';
-        setCursor(G.targets[0].x, G.targets[0].y);
-        UI.toast('選擇攻擊目標（Esc 取消）');
-        return;
+      case 'attack': return pickTarget('attack', B.targetsFrom(b, me), '選擇攻擊目標（Esc 取消）');
+      case 'staff': return pickTarget('heal', B.healTargets(b, me), '選擇治療對象（Esc 取消）');
+      case 'spirit': {
+        const list = B.spiritsUsable(b, me).map((s) => ({ id: s.id, name: s.name, note: 'SP ' + (s.cost || 0), title: s.desc || '', disabled: (s.cost || 0) > me.sp }));
+        const sid = await menuAt(list);
+        if (sid == null) return actionMenu(me);
+        const sp = G.campaign.spirits[sid];
+        const apply = async (target) => {
+          const r = B.useSpirit(b, me, sid, target);
+          if (r.error) UI.toast(r.error);
+          else for (const t of r.targets) fx(t.x, t.y, sp.name + (r.text !== sp.name ? ' ' + r.text : ''), '#ff9ae8');
+          await UI.sleep(350);
+          updateHud();
+          if (sp.effect === 'accel' && !r.error) { B.undoMove(me); G.threat = R.threatTiles(b, me); G.reach = G.threat.reach; G.mode = 'move'; setCursor(me.x, me.y); UI.toast('移動力 +' + (sp.value || 3)); return; }
+          return actionMenu(me);
+        };
+        if (sp.target === 'ally') {
+          const ts = B.spiritTargets(b, me, sid);
+          if (!ts.length) { UI.toast('沒有可選的同伴'); return actionMenu(me); }
+          G.targetCb = (t) => { G.targetKind = null; apply(t); };
+          return pickTarget('spirit', ts, `${sp.name}：選擇同伴（Esc 取消）`);
+        }
+        return apply();
+      }
+      case 'item': {
+        const list = me.items.map((it, i) => { const d = G.campaign.items[it.id] || {}; return { id: i, name: d.name || it.id, icon: d.icon, note: '×' + it.uses, title: d.desc || '' }; });
+        const idx = await menuAt(list);
+        if (idx == null) return actionMenu(me);
+        G.mode = 'busy';
+        await doItem(me, idx);
+        break;
+      }
+      case 'trade': {
+        const ps = B.tradePartners(b, me);
+        let other = ps[0];
+        if (ps.length > 1) {
+          const id = await menuAt(ps.map((o) => ({ id: o.uid, name: o.name })));
+          if (id == null) return actionMenu(me);
+          other = B.byUid(b, id);
+        }
+        await UI.trade(me, other, G.campaign, (f, t2, k, i) => B.transfer(b, f, t2, k, i));
+        updateHud();
+        return actionMenu(me);
+      }
       case 'talk': {
         let other = B.byUid(b, act.targets[0]);
         if (act.targets.length > 1) {
@@ -541,7 +632,7 @@
 
   async function cancel() {
     if (G.mode === 'move') { resetSelection(); G.mode = 'idle'; }
-    else if (G.mode === 'target') { G.targets = null; await actionMenu(B.byUid(G.battle, G.sel)); }
+    else if (G.mode === 'target') { G.targets = null; G.targetKind = null; await actionMenu(B.byUid(G.battle, G.sel)); }
     else if (G.mode === 'idle') G.view = null;
     updateHud();
   }

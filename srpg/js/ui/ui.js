@@ -32,10 +32,10 @@
       let drawn = false;
       if (sp) drawn = SRPG.sprites.draw(pctx, sp, 0, 'player', 0, 0, pc.width, pc.height);
       if (!drawn && unitDef) {
-        // 沒有頭像就用放大的行走圖
+        // 沒有頭像就用行走圖的上半身
         pctx.fillStyle = '#1a2036'; pctx.fillRect(0, 0, pc.width, pc.height);
         const s = SRPG.renderer.spriteFor(campaign, { id: step.who });
-        drawn = s && SRPG.sprites.draw(pctx, s, 0, 'player', 8, 8, pc.width - 16, pc.height - 16);
+        drawn = s && SRPG.sprites.drawBust(pctx, s, 'player', 4, 4, pc.width - 8, pc.height - 8);
       }
       if (!drawn) SRPG.sprites.fallbackPortrait(pctx, step.name, 'player', 0, 0, pc.width);
     }
@@ -87,12 +87,15 @@
     m.className = 'menu';
     items.forEach((it, i) => {
       const b = document.createElement('button');
-      b.className = 'btn'; b.textContent = it.name; b.disabled = !!it.disabled; b.dataset.i = i;
+      b.className = 'btn'; b.disabled = !!it.disabled; b.dataset.i = i;
+      b.innerHTML = (it.icon != null ? `<span style="${SRPG.sprites.iconStyle(it.icon, 18)}"></span> ` : '') + esc(it.name) +
+        (it.note ? `<small class="note">${esc(it.note)}</small>` : '');
+      if (it.title) b.title = it.title;
       m.appendChild(b);
     });
     layer.appendChild(m);
     const app = $('app').getBoundingClientRect();
-    const mw = 140, mh = items.length * 36 + 12;
+    const mw = 200, mh = items.length * 36 + 12;
     m.style.left = Math.max(4, Math.min(app.width - mw - 4, px)) + 'px';
     m.style.top = Math.max(44, Math.min(app.height - mh - 4, py)) + 'px';
     return new Promise((resolve) => {
@@ -141,17 +144,29 @@
       `<span class="${ups && ups[k] ? 'up' : ''}"><b>${N[k]}</b>${u.stats[k]}${ups && ups[k] ? '+' + ups[k] : ''}</span>`).join('') + '</div>';
   }
 
+  const icon = (i, sz) => (i != null ? `<span style="${SRPG.sprites.iconStyle(i, sz || 16)}"></span>` : '');
+  UI.icon = icon;
+
   UI.unitCard = function (u, b) {
     const el = $('unitCard');
     if (!u) { el.hidden = true; return; }
-    const w = SRPG.rules.weaponOf(b, u);
+    const R = SRPG.rules, rules = R.rulesOf(b);
     const ratio = Math.max(0, u.hp / u.stats.hp) * 100;
+    const wl = u.weapons.map((id, i) => {
+      const w = b.campaign.weapons[id] || {};
+      const usable = R.isStaff(w) || R.canAttackWith(b, u, Object.assign({ id }, w));
+      return `<div class="${i === u.equip ? 'eq' : ''}${usable ? '' : ' dim'}">${icon(w.icon)} ${esc(w.name || id)} <small>${R.isStaff(w) ? '回復' + (w.heal || 10) : '威' + (w.mt || 0) + ' 命' + (w.hit || 0)} 射${(w.range || [1, 1]).join('-')}${w.brave ? ' 勇' : ''}${w.morale ? ' 氣' + w.morale : ''}</small></div>`;
+    }).join('');
+    const il = (u.items || []).map((it) => { const d = b.campaign.items[it.id] || {}; return `<div>${icon(d.icon)} ${esc(d.name || it.id)} <small>×${it.uses}</small></div>`; }).join('');
+    const bf = Object.keys(u.buffs || {}).map((k) => (R.EFFECTS[k] || {}).name || k);
     el.hidden = false;
     el.innerHTML = `<h3 class="team-${u.team}">${esc(u.name)}${u.boss ? ' ★' : ''}</h3>
       <div class="row"><span>${esc(u.className)} Lv${u.level}</span><span>EXP ${u.exp}</span></div>
-      <div class="row"><span>HP ${u.hp}/${u.stats.hp}</span><span>移動 ${u.move}</span></div>
+      <div class="row"><span>HP ${u.hp}/${u.stats.hp}</span><span>移動 ${R.moveOf(u)}</span></div>
       <div class="hpbar"><i style="width:${ratio}%"></i></div>
-      <div>武器：${w ? esc(w.name || w.id) + ` (威${w.mt || 0} 命${w.hit || 0} 射${(w.range || [1, 1]).join('-')})` : '—'}</div>
+      ${rules.morale || rules.spirits ? `<div class="row">${rules.morale ? `<span>氣力 ${u.morale}</span>` : ''}${rules.spirits && u.maxSp ? `<span>SP ${u.sp}/${u.maxSp}</span>` : ''}</div>` : ''}
+      ${bf.length ? `<div class="buffs">${bf.map((x) => `<span>${esc(x)}</span>`).join('')}</div>` : ''}
+      <div class="inv">${wl}${il}</div>
       ${statsHtml(u)}`;
   };
 
@@ -162,30 +177,72 @@
     el.innerHTML = `<div class="row"><b>${esc(t.name)}</b><span>防+${t.def || 0} 迴避+${t.avo || 0}${t.heal ? ' 回復' + t.heal + '%' : ''}</span></div>`;
   };
 
-  /* ---------- 戰鬥預測：回傳 true(攻擊)/false(取消) ---------- */
-  UI.forecast = function (fc, att, def) {
+  /* ---------- 戰鬥預測：opts = { att, def, weapons:[{i,name,icon}], cur, compute(i)→fc }
+     回傳 { ok:boolean, weapon:i } ---------- */
+  UI.forecast = function (opts) {
     const el = $('forecast');
-    const side = (s) => s ? { dmg: s.dmg + (s.count > 1 ? ' <span class="x2">×2</span>' : ''), hit: s.hit, crit: s.crit, wpn: esc(s.weapon), tri: s.tri } : { dmg: '—', hit: '—', crit: '—', wpn: '無法反擊', tri: 0 };
-    const a = side(fc.att), d = side(fc.def);
+    const { att, def } = opts;
+    let cur = opts.cur;
+    const side = (s) => s ? { dmg: s.dmg + (s.strikes > 1 ? ` <span class="x2">×${s.strikes}</span>` : ''), hit: s.hit, crit: s.crit, wpn: icon(s.icon) + esc(s.weapon), tri: s.tri, tags: s.tags || [] } : { dmg: '—', hit: '—', crit: '—', wpn: '無法反擊', tri: 0, tags: [] };
     const arrow = (t) => (t > 0 ? ' <span style="color:#5ae07a">▲</span>' : t < 0 ? ' <span style="color:#ff6464">▼</span>' : '');
+    const draw = () => {
+      const fc = opts.compute(cur);
+      const a = side(fc.att), d = side(fc.def);
+      const many = opts.weapons.length > 1;
+      const tags = a.tags.concat(d.tags.map((x) => x.replace('對方', '敵:')));
+      el.innerHTML = `<table>
+        <tr><th></th><th class="team-${att.team}">${esc(att.name)}</th><th class="team-${def.team}">${esc(def.name)}</th></tr>
+        <tr><th>武器</th><td>${many ? '<button class="btn sm" data-w="-1">◀</button> ' : ''}${a.wpn}${arrow(a.tri)}${many ? ' <button class="btn sm" data-w="1">▶</button>' : ''}</td><td>${d.wpn}${arrow(d.tri)}</td></tr>
+        <tr><th>HP</th><td>${att.hp}</td><td>${def.hp}</td></tr>
+        <tr><th>傷害</th><td>${a.dmg}</td><td>${d.dmg}</td></tr>
+        <tr><th>命中</th><td>${a.hit}</td><td>${d.hit}</td></tr>
+        <tr><th>必殺</th><td>${a.crit}</td><td>${d.crit}</td></tr>
+        ${att.morale != null && SRPG.rules.rulesOf({ campaign: opts.campaign }).morale ? `<tr><th>氣力</th><td>${att.morale}</td><td>${def.morale}</td></tr>` : ''}
+        </table>${tags.length ? `<div class="buffs">${tags.map((x) => `<span>${esc(x)}</span>`).join('')}</div>` : ''}
+        <div class="actions"><button class="btn" data-v="0">取消</button><button class="btn primary" data-v="1">攻擊！</button></div>`;
+      el.querySelectorAll('button[data-v]').forEach((b) => (b.onclick = () => done(b.dataset.v === '1')));
+      el.querySelectorAll('button[data-w]').forEach((b) => (b.onclick = () => cycle(+b.dataset.w)));
+    };
+    const cycle = (k) => {
+      const ix = opts.weapons.findIndex((w) => w.i === cur);
+      cur = opts.weapons[(ix + k + opts.weapons.length) % opts.weapons.length].i;
+      draw();
+    };
+    let done;
     el.hidden = false;
-    el.innerHTML = `<table>
-      <tr><th></th><th class="team-${att.team}">${esc(att.name)}</th><th class="team-${def.team}">${esc(def.name)}</th></tr>
-      <tr><th>武器</th><td>${a.wpn}${arrow(a.tri)}</td><td>${d.wpn}${arrow(d.tri)}</td></tr>
-      <tr><th>HP</th><td>${att.hp}</td><td>${def.hp}</td></tr>
-      <tr><th>傷害</th><td>${a.dmg}</td><td>${d.dmg}</td></tr>
-      <tr><th>命中</th><td>${a.hit}</td><td>${d.hit}</td></tr>
-      <tr><th>必殺</th><td>${a.crit}</td><td>${d.crit}</td></tr></table>
-      <div class="actions"><button class="btn" data-v="0">取消</button><button class="btn primary" data-v="1">攻擊！</button></div>`;
     return new Promise((resolve) => {
-      const done = (v) => { el.hidden = true; keyHandler = null; resolve(v); };
-      el.querySelectorAll('button').forEach((b) => (b.onclick = () => done(b.dataset.v === '1')));
-      UI._forecastDone = done;
+      done = (v) => { el.hidden = true; keyHandler = null; resolve({ ok: v, weapon: cur }); };
+      draw();
       keyHandler = (e) => {
         if (['Enter', 'z', 'Z', ' '].includes(e.key)) done(true);
         else if (['Escape', 'x', 'X'].includes(e.key)) done(false);
+        else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') cycle(-1);
+        else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') cycle(1);
         return true;
       };
+    });
+  };
+
+  /* ---------- 交換：點擊物品移到另一邊，transfer(from,to,kind,idx) ---------- */
+  UI.trade = function (a, b, campaign, transfer) {
+    const el = $('trade');
+    const col = (u, other) => `<div class="tcol"><h3 class="team-${u.team}">${esc(u.name)}</h3>` +
+      u.weapons.map((id, i) => { const w = campaign.weapons[id] || {}; return `<button class="btn" data-u="${u.uid}" data-k="weapon" data-i="${i}">${icon(w.icon)} ${esc(w.name || id)}</button>`; }).join('') +
+      (u.items || []).map((it, i) => { const d = campaign.items[it.id] || {}; return `<button class="btn" data-u="${u.uid}" data-k="item" data-i="${i}">${icon(d.icon)} ${esc(d.name || it.id)} ×${it.uses}</button>`; }).join('') + '</div>';
+    return new Promise((resolve) => {
+      const draw = () => {
+        el.innerHTML = `<div class="tgrid">${col(a, b)}<div class="tarrow">⇄</div>${col(b, a)}</div>
+          <p class="hint">點擊物品即可移到另一邊</p><div class="actions"><button class="btn primary" data-done="1">完成</button></div>`;
+        el.querySelectorAll('button[data-u]').forEach((btn) => (btn.onclick = () => {
+          const from = +btn.dataset.u === a.uid ? a : b, to = from === a ? b : a;
+          transfer(from, to, btn.dataset.k, +btn.dataset.i); draw();
+        }));
+        el.querySelector('[data-done]').onclick = finish;
+      };
+      const finish = () => { el.className = 'card'; keyHandler = null; resolve(); };
+      el.className = 'card show';
+      draw();
+      keyHandler = (e) => { if (['Escape', 'x', 'X', 'Enter'].includes(e.key)) finish(); return true; };
     });
   };
 

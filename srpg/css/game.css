@@ -104,3 +104,22 @@ button { font-family: inherit; }
   #forecast { width: calc(100% - 20px); top: auto; bottom: 10px; }
   #dialog .portrait { width: 72px; height: 72px; }
 }
+
+/* 戰鬥指令擴充 */
+.menu .btn { display: flex; align-items: center; gap: 4px; }
+.menu .note { margin-left: auto; padding-left: 10px; color: var(--mut); font-size: 11px; }
+.btn.sm { padding: 0 6px; font-size: 11px; }
+.card .inv { margin: 4px 0; display: flex; flex-direction: column; gap: 1px; }
+.card .inv small { color: var(--mut); }
+.card .inv .eq { color: var(--accent); }
+.card .inv .dim { opacity: 0.45; }
+.buffs { display: flex; flex-wrap: wrap; gap: 3px; margin: 3px 0; }
+.buffs span { background: #4a2050; color: #ffb3f0; border-radius: 8px; padding: 0 6px; font-size: 11px; }
+#trade { position: absolute; z-index: 45; left: 50%; top: 50%; transform: translate(-50%, -50%); display: none; min-width: min(480px, 94vw); }
+#trade.show { display: block; }
+#trade .tgrid { display: grid; grid-template-columns: 1fr 30px 1fr; gap: 8px; align-items: start; }
+#trade .tcol { display: flex; flex-direction: column; gap: 4px; }
+#trade .tcol .btn { text-align: left; }
+#trade .tarrow { text-align: center; font-size: 22px; color: var(--accent); padding-top: 30px; }
+#trade .actions { display: flex; justify-content: flex-end; }
+#trade .hint { color: var(--mut); font-size: 12px; }

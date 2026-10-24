@@ -8,7 +8,11 @@ window.SRPG_DEFAULT_CAMPAIGN = {
   "author": "SRPG Demo",
   "start": "ch1",
   "permadeath": true,
-  "desc": "內建示範：3 章、劇情分歧、說服、拜訪村莊、增援。"
+  "rules": {
+   "morale": true,
+   "spirits": true
+  },
+  "desc": "內建示範：3 章、劇情分歧、說服、拜訪村莊、增援；杖、道具、交換、精神指令、氣力。"
  },
  "weapons": {
   "iron_sword": {
@@ -21,7 +25,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "range": [
     1,
     1
-   ]
+   ],
+   "icon": 296
   },
   "slim_sword": {
    "name": "細劍",
@@ -33,7 +38,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "range": [
     1,
     1
-   ]
+   ],
+   "icon": 287
   },
   "killing_edge": {
    "name": "殺劍",
@@ -45,7 +51,37 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "range": [
     1,
     1
-   ]
+   ],
+   "icon": 294
+  },
+  "brave_sword": {
+   "name": "勇者之劍",
+   "type": "sword",
+   "dmg": "phys",
+   "mt": 8,
+   "hit": 75,
+   "crit": 0,
+   "range": [
+    1,
+    1
+   ],
+   "brave": true,
+   "icon": 298
+  },
+  "meteor": {
+   "name": "流星斬",
+   "type": "sword",
+   "dmg": "phys",
+   "mt": 14,
+   "hit": 85,
+   "crit": 10,
+   "range": [
+    1,
+    1
+   ],
+   "morale": 115,
+   "icon": 299,
+   "desc": "氣力 115 以上才能使用的必殺技"
   },
   "iron_lance": {
    "name": "鐵槍",
@@ -57,7 +93,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "range": [
     1,
     1
-   ]
+   ],
+   "icon": 270
   },
   "javelin": {
    "name": "標槍",
@@ -69,7 +106,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "range": [
     1,
     2
-   ]
+   ],
+   "icon": 271
   },
   "iron_axe": {
    "name": "鐵斧",
@@ -81,7 +119,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "range": [
     1,
     1
-   ]
+   ],
+   "icon": 290
   },
   "hand_axe": {
    "name": "手斧",
@@ -93,7 +132,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "range": [
     1,
     2
-   ]
+   ],
+   "icon": 285
   },
   "iron_bow": {
    "name": "鐵弓",
@@ -108,7 +148,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    ],
    "effective": [
     "fly"
-   ]
+   ],
+   "icon": 57
   },
   "fire": {
    "name": "火焰",
@@ -120,7 +161,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "range": [
     1,
     2
-   ]
+   ],
+   "icon": 263
   },
   "thunder": {
    "name": "雷擊",
@@ -132,7 +174,65 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "range": [
     1,
     2
-   ]
+   ],
+   "icon": 256
+  },
+  "heal_staff": {
+   "name": "治療杖",
+   "type": "staff",
+   "dmg": "mag",
+   "heal": 10,
+   "range": [
+    1,
+    1
+   ],
+   "icon": 278
+  },
+  "physic": {
+   "name": "遠距治療杖",
+   "type": "staff",
+   "dmg": "mag",
+   "heal": 8,
+   "range": [
+    1,
+    3
+   ],
+   "icon": 281
+  }
+ },
+ "items": {
+  "vulnerary": {
+   "name": "傷藥",
+   "kind": "heal",
+   "power": 10,
+   "uses": 3,
+   "icon": 217,
+   "desc": "回復 10 HP"
+  },
+  "elixir": {
+   "name": "萬靈藥",
+   "kind": "heal",
+   "power": 99,
+   "uses": 1,
+   "icon": 225,
+   "desc": "HP 全回復"
+  },
+  "power_ring": {
+   "name": "力量戒指",
+   "kind": "boost",
+   "stat": "str",
+   "power": 2,
+   "uses": 1,
+   "icon": 233,
+   "desc": "力量永久 +2"
+  },
+  "sp_potion": {
+   "name": "SP 回復藥",
+   "kind": "sp",
+   "power": 20,
+   "uses": 1,
+   "icon": 229,
+   "desc": "SP +20"
   }
  },
  "classes": {
@@ -204,6 +304,12 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "move": 5,
    "moveType": "foot",
    "sprite": "lancer"
+  },
+  "cleric": {
+   "name": "僧侶",
+   "move": 5,
+   "moveType": "foot",
+   "sprite": "mage"
   }
  },
  "units": {
@@ -222,7 +328,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "res": 2
    },
    "weapons": [
-    "iron_sword"
+    "iron_sword",
+    "meteor"
    ],
    "growth": {
     "hp": 80,
@@ -235,7 +342,16 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "res": 25
    },
    "lord": true,
-   "portrait": "alan"
+   "sprite": "chara_5",
+   "items": [
+    "vulnerary"
+   ],
+   "sp": 40,
+   "spirits": [
+    "strike",
+    "valor",
+    "guts"
+   ]
   },
   "mira": {
    "name": "米菈",
@@ -265,7 +381,16 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "def": 30,
     "res": 15
    },
-   "portrait": "mira"
+   "sprite": "chara_6",
+   "items": [
+    "vulnerary"
+   ],
+   "sp": 35,
+   "spirits": [
+    "accel",
+    "iron_wall",
+    "strike"
+   ]
   },
   "rook": {
    "name": "魯克",
@@ -294,7 +419,13 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "def": 20,
     "res": 15
    },
-   "portrait": "rook"
+   "sprite": "chara_3",
+   "sp": 30,
+   "spirits": [
+    "focus",
+    "strike",
+    "effort"
+   ]
   },
   "elle": {
    "name": "艾兒",
@@ -323,7 +454,55 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "def": 15,
     "res": 40
    },
-   "portrait": "elle"
+   "sprite": "chara_4",
+   "items": [
+    "sp_potion"
+   ],
+   "sp": 35,
+   "spirits": [
+    "valor",
+    "alert",
+    "effort"
+   ]
+  },
+  "lina": {
+   "name": "莉娜",
+   "class": "cleric",
+   "level": 1,
+   "stats": {
+    "hp": 16,
+    "str": 0,
+    "mag": 5,
+    "skl": 4,
+    "spd": 6,
+    "lck": 8,
+    "def": 1,
+    "res": 7
+   },
+   "weapons": [
+    "heal_staff"
+   ],
+   "growth": {
+    "hp": 50,
+    "str": 0,
+    "mag": 50,
+    "skl": 35,
+    "spd": 45,
+    "lck": 60,
+    "def": 10,
+    "res": 50
+   },
+   "sprite": "chara_0",
+   "items": [
+    "vulnerary",
+    "elixir"
+   ],
+   "sp": 50,
+   "spirits": [
+    "trust",
+    "cheer",
+    "alert"
+   ]
   },
   "kit": {
    "name": "基特",
@@ -352,7 +531,16 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "def": 15,
     "res": 15
    },
-   "portrait": "kit"
+   "sprite": "chara_1",
+   "items": [
+    "vulnerary"
+   ],
+   "sp": 30,
+   "spirits": [
+    "alert",
+    "accel",
+    "focus"
+   ]
   },
   "sera": {
    "name": "瑟拉",
@@ -382,7 +570,13 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "def": 20,
     "res": 40
    },
-   "portrait": "sera"
+   "sprite": "chara_7",
+   "sp": 40,
+   "spirits": [
+    "accel",
+    "alert",
+    "strike"
+   ]
   },
   "bandit": {
    "name": "山賊",
@@ -438,7 +632,9 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "iron_axe",
     "hand_axe"
    ],
-   "portrait": "garr"
+   "items": [
+    "vulnerary"
+   ]
   },
   "soldier": {
    "name": "帝國兵",
@@ -512,6 +708,24 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "fire"
    ]
   },
+  "imp_cleric": {
+   "name": "帝國僧侶",
+   "class": "cleric",
+   "level": 4,
+   "stats": {
+    "hp": 17,
+    "str": 0,
+    "mag": 5,
+    "skl": 4,
+    "spd": 5,
+    "lck": 3,
+    "def": 2,
+    "res": 6
+   },
+   "weapons": [
+    "heal_staff"
+   ]
+  },
   "voss": {
    "name": "沃斯將軍",
    "class": "knight",
@@ -530,7 +744,10 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "iron_lance",
     "javelin"
    ],
-   "portrait": "voss"
+   "items": [
+    "elixir"
+   ],
+   "sprite": "chara_2"
   }
  },
  "sprites": {
@@ -829,6 +1046,70 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "................"
     ]
    ]
+  },
+  "chara_0": {
+   "name": "藍衣少女",
+   "image": "assets/characters.png",
+   "sheet": "rpgmaker",
+   "index": 0,
+   "frameW": 36,
+   "frameH": 36
+  },
+  "chara_1": {
+   "name": "銀髮少女",
+   "image": "assets/characters.png",
+   "sheet": "rpgmaker",
+   "index": 1,
+   "frameW": 36,
+   "frameH": 36
+  },
+  "chara_2": {
+   "name": "狐耳少女",
+   "image": "assets/characters.png",
+   "sheet": "rpgmaker",
+   "index": 2,
+   "frameW": 36,
+   "frameH": 36
+  },
+  "chara_3": {
+   "name": "綠帽少女",
+   "image": "assets/characters.png",
+   "sheet": "rpgmaker",
+   "index": 3,
+   "frameW": 36,
+   "frameH": 36
+  },
+  "chara_4": {
+   "name": "魔女",
+   "image": "assets/characters.png",
+   "sheet": "rpgmaker",
+   "index": 4,
+   "frameW": 36,
+   "frameH": 36
+  },
+  "chara_5": {
+   "name": "紅白巫女",
+   "image": "assets/characters.png",
+   "sheet": "rpgmaker",
+   "index": 5,
+   "frameW": 36,
+   "frameH": 36
+  },
+  "chara_6": {
+   "name": "紅髮武人",
+   "image": "assets/characters.png",
+   "sheet": "rpgmaker",
+   "index": 6,
+   "frameW": 36,
+   "frameH": 36
+  },
+  "chara_7": {
+   "name": "金髮少女",
+   "image": "assets/characters.png",
+   "sheet": "rpgmaker",
+   "index": 7,
+   "frameW": 36,
+   "frameH": 36
   }
  },
  "portraits": {},
@@ -874,6 +1155,12 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "team": "player",
      "x": 1,
      "y": 9
+    },
+    {
+     "unit": "lina",
+     "team": "player",
+     "x": 0,
+     "y": 8
     },
     {
      "unit": "bandit",
@@ -1009,6 +1296,12 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "y": 4
     },
     {
+     "unit": "lina",
+     "team": "player",
+     "x": 8,
+     "y": 5
+    },
+    {
      "unit": "kit",
      "team": "player",
      "x": 5,
@@ -1128,6 +1421,12 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "y": 6
     },
     {
+     "unit": "lina",
+     "team": "player",
+     "x": 0,
+     "y": 6
+    },
+    {
      "unit": "kit",
      "team": "player",
      "x": 1,
@@ -1171,6 +1470,13 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "team": "enemy",
      "x": 12,
      "y": 7
+    },
+    {
+     "unit": "imp_cleric",
+     "team": "enemy",
+     "x": 13,
+     "y": 4,
+     "ai": "guard"
     }
    ],
    "victory": {
@@ -1242,6 +1548,12 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "y": 5
     },
     {
+     "unit": "lina",
+     "team": "player",
+     "x": 0,
+     "y": 5
+    },
+    {
      "unit": "kit",
      "team": "player",
      "x": 1,
@@ -1285,6 +1597,13 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "x": 11,
      "y": 4,
      "ai": "hold"
+    },
+    {
+     "unit": "imp_cleric",
+     "team": "enemy",
+     "x": 13,
+     "y": 5,
+     "ai": "guard"
     },
     {
      "unit": "voss",
@@ -1347,8 +1666,17 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "text": "弓箭只能射兩格外的敵人，別讓他們貼近我。"
    },
    {
+    "cmd": "say",
+    "who": "lina",
+    "text": "受傷了就到我身邊來，我用治療杖幫大家回復。"
+   },
+   {
     "cmd": "narrate",
-    "text": "【提示】點選我方單位→點藍色格移動→選擇行動。村莊(V)可以拜訪；艾倫可以和盜賊基特「交談」。"
+    "text": "【提示】點選我方單位→點藍色格移動→選擇行動：攻擊／杖／精神／道具／交換／待機。村莊(V)可以拜訪；艾倫可以和盜賊基特「交談」。"
+   },
+   {
+    "cmd": "narrate",
+    "text": "【精神指令】消耗 SP 發動「必中」「熱血」「加速」等效果。【氣力】戰鬥與擊破敵人會提升，氣力越高傷害越大；艾倫的「流星斬」需要氣力 115。"
    }
   ],
   "ch1_kit": [
@@ -1442,7 +1770,12 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    {
     "cmd": "say",
     "name": "老婆婆",
-    "text": "年輕人，小心帝國的天馬騎士。她們……其實並不想打仗。"
+    "text": "年輕人，小心帝國的天馬騎士。她們……其實並不想打仗。這枚戒指送你，會讓你更有力氣。"
+   },
+   {
+    "cmd": "give",
+    "unit": "alan",
+    "item": "power_ring"
    },
    {
     "cmd": "set",
@@ -1608,7 +1941,12 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    {
     "cmd": "say",
     "who": "mira",
-    "text": "前方就是沃斯將軍的本陣了。"
+    "text": "前方就是沃斯將軍的本陣了。這把在敵營找到的勇者之劍，給艾倫大人用吧。"
+   },
+   {
+    "cmd": "give",
+    "unit": "alan",
+    "weapon": "brave_sword"
    },
    {
     "cmd": "if",

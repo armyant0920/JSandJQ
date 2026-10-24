@@ -3,7 +3,7 @@
   'use strict';
   const { h } = ED;
   const CMDS = [['say', '💬 說話'], ['narrate', '📜 旁白'], ['choice', '🔀 選項'], ['label', '🏷 標籤'], ['goto', '↪ 跳轉'],
-    ['set', '🚩 設定旗標'], ['if', '❓ 條件跳轉'], ['spawn', '⚔ 增援'], ['recruit', '🤝 說服加入'], ['give', '🎁 給予武器'], ['end', '⏹ 結束']];
+    ['set', '🚩 設定旗標'], ['if', '❓ 條件跳轉'], ['spawn', '⚔ 增援'], ['recruit', '🤝 說服加入'], ['give', '🎁 給予物品'], ['end', '⏹ 結束']];
   const TEAMS = [['enemy', '敵方'], ['player', '我方'], ['ally', '友軍']];
   const TEMPLATES = {
     say: () => ({ cmd: 'say', who: Object.keys(ED.c.units)[0], text: '' }),
@@ -73,7 +73,12 @@
           h('div.row', {}, h('button', { onclick: () => { cmd.units.push({ unit: Object.keys(ED.c.units)[0], team: 'enemy', x: 0, y: 0 }); ED.dirty(true); } }, '＋ 單位'),
             h('span.hint', {}, '座標被占用時會自動找最近空格'))];
       case 'recruit': return [h('div.row', {}, '讓', ED.select(cmd, 'unit', units), '加入我方')];
-      case 'give': return [h('div.row', {}, '給', ED.select(cmd, 'unit', units), ED.select(cmd, 'weapon', ED.named('weapons')))];
+      case 'give': {
+        const kind = { k: cmd.item ? 'item' : 'weapon' };
+        return [h('div.row', {}, '給', ED.select(cmd, 'unit', units),
+          ED.select(kind, 'k', [['weapon', '武器'], ['item', '道具']], { onchange: (v) => { delete cmd.weapon; delete cmd.item; cmd[v] = Object.keys(ED.c[v === 'item' ? 'items' : 'weapons'])[0]; ED.dirty(true); } }),
+          kind.k === 'item' ? ED.select(cmd, 'item', ED.named('items')) : ED.select(cmd, 'weapon', ED.named('weapons')))];
+      }
       default: return [h('span.hint', {}, cmd.cmd === 'end' ? '結束這段劇本' : JSON.stringify(cmd))];
     }
   }
