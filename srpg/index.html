@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SRPG 戰棋</title>
+  <link rel="stylesheet" href="css/game.css">
+</head>
+<body>
+<div id="app">
+  <div id="topbar">
+    <span class="title" id="chapterName">SRPG</span>
+    <span class="pill" id="turnInfo">—</span>
+    <span class="pill" id="objective">—</span>
+    <span class="sp"></span>
+    <button class="btn" id="btnDanger" title="顯示所有敵人的攻擊範圍 (D)">⚠ 危險範圍</button>
+    <button class="btn" id="btnEnd" title="結束我方回合 (E)">⏭ 結束回合</button>
+    <button class="btn" id="btnMenu" title="選單 (M)">☰ 選單</button>
+  </div>
+  <div id="stage"><canvas id="map" width="480" height="480"></canvas></div>
+
+  <div id="info"><div class="card" id="unitCard" hidden></div><div class="card" id="terrainCard" hidden></div></div>
+  <div class="card" id="forecast" hidden></div>
+  <div id="menuLayer"></div>
+  <div id="banner"></div>
+
+  <div id="dialog"><canvas class="portrait" width="112" height="112"></canvas>
+    <div class="box"><div class="name"></div><div class="text"></div><span class="more">▼</span></div></div>
+  <div id="choices"></div>
+  <div class="card" id="levelup"></div>
+  <div id="toast"></div>
+
+  <!-- 標題 -->
+  <div class="screen" id="titleScreen">
+    <h1>⚔ SRPG 戰棋</h1>
+    <p id="campaignDesc"></p>
+    <div class="col">
+      <select id="campaignSelect">
+        <option value="demo">內建示範劇本</option>
+        <option value="custom">編輯器中的劇本（本機）</option>
+        <option value="file">從檔案載入劇本…</option>
+      </select>
+      <button class="btn primary" id="btnNew">新遊戲</button>
+      <button class="btn" id="btnLoad">讀取存檔</button>
+      <button class="btn" id="btnImportSave">匯入存檔檔案…</button>
+      <a class="btn" href="editor.html" style="text-decoration:none">🛠 開啟編輯器</a>
+    </div>
+    <p style="font-size:12px">操作：點選/方向鍵移動游標，Enter/Z 確定，Esc/X/右鍵 取消，E 結束回合，D 危險範圍</p>
+  </div>
+  <div class="screen" id="slotScreen"></div>
+  <div class="screen" id="endScreen"></div>
+  <input type="file" id="fileCampaign" accept=".json,application/json" hidden>
+  <input type="file" id="fileSave" accept=".json,application/json" hidden>
+</div>
+
+<script src="js/core/util.js"></script>
+<script src="js/core/campaign.js"></script>
+<script src="js/core/rules.js"></script>
+<script src="js/core/battle.js"></script>
+<script src="js/core/ai.js"></script>
+<script src="js/core/script.js"></script>
+<script src="js/core/save.js"></script>
+<script src="js/render/sprites.js"></script>
+<script src="js/render/renderer.js"></script>
+<script src="data/demo-campaign.js"></script>
+<script src="js/ui/ui.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>

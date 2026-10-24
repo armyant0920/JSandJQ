@@ -1,0 +1,106 @@
+:root {
+  --bg: #0d0f17; --panel: rgba(16, 20, 34, 0.94); --line: #3a4466; --accent: #ffd24a;
+  --txt: #e8ebf3; --mut: #9aa3bd; --blue: #5a8cff; --red: #ff6464; --green: #5ae07a;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--txt);
+  font-family: 'Segoe UI', 'Microsoft JhengHei', 'PingFang TC', 'Noto Sans TC', sans-serif; font-size: 14px; }
+button { font-family: inherit; }
+#app { position: relative; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+/* 上方列 */
+#topbar { display: flex; align-items: center; gap: 14px; padding: 6px 12px; background: #070910;
+  border-bottom: 1px solid var(--line); min-height: 40px; flex-wrap: wrap; }
+#topbar .title { color: var(--accent); font-weight: bold; }
+#topbar .sp { flex: 1; }
+#topbar .pill { background: #1a2036; border: 1px solid var(--line); border-radius: 12px; padding: 2px 10px; font-size: 12px; }
+.btn { background: #1c2340; color: var(--txt); border: 1px solid var(--line); border-radius: 6px;
+  padding: 6px 12px; cursor: pointer; font-size: 13px; }
+.btn:hover, .btn.focus { border-color: var(--accent); color: var(--accent); }
+.btn.primary { background: #3a3010; border-color: var(--accent); color: var(--accent); }
+.btn:disabled { opacity: 0.4; cursor: default; }
+
+/* 地圖區 */
+#stage { position: relative; flex: 1; overflow: auto; display: flex; align-items: flex-start; justify-content: center; padding: 10px; }
+#map { image-rendering: pixelated; display: block; max-width: 100%; height: auto; cursor: pointer; touch-action: manipulation;
+  box-shadow: 0 0 0 1px var(--line), 0 8px 30px #0008; }
+
+/* 側邊資訊 */
+#info { position: absolute; left: 10px; top: 50px; width: 220px; pointer-events: none; display: flex; flex-direction: column; gap: 8px; z-index: 5; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; font-size: 12px; }
+.card h3 { margin: 0 0 4px; font-size: 14px; }
+.card .row { display: flex; justify-content: space-between; gap: 6px; }
+.card .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 2px 6px; margin-top: 4px; }
+.card .stats span b { color: var(--mut); font-weight: normal; margin-right: 2px; }
+.team-player { color: var(--blue); } .team-enemy { color: var(--red); } .team-ally { color: var(--green); }
+.hpbar { height: 6px; background: #000a; border-radius: 3px; overflow: hidden; margin: 3px 0; }
+.hpbar i { display: block; height: 100%; background: var(--green); }
+
+/* 浮動選單 */
+.menu { position: absolute; z-index: 20; background: var(--panel); border: 1px solid var(--accent); border-radius: 8px;
+  padding: 6px; display: flex; flex-direction: column; gap: 4px; min-width: 120px; box-shadow: 0 6px 24px #000a; }
+.menu .btn { text-align: left; }
+
+/* 戰鬥預測 */
+#forecast { position: absolute; z-index: 21; right: 10px; top: 50px; width: 290px; }
+#forecast table { width: 100%; border-collapse: collapse; text-align: center; font-size: 13px; }
+#forecast td, #forecast th { padding: 3px 4px; }
+#forecast th { color: var(--mut); font-weight: normal; }
+#forecast .x2 { color: var(--accent); font-size: 11px; }
+#forecast .actions { display: flex; gap: 6px; margin-top: 8px; justify-content: flex-end; }
+
+/* 回合橫幅 */
+#banner { position: absolute; z-index: 30; left: 0; right: 0; top: 40%; text-align: center; pointer-events: none;
+  font-size: 34px; font-weight: bold; letter-spacing: 6px; padding: 14px 0; opacity: 0; transition: opacity 0.25s;
+  background: linear-gradient(90deg, transparent, #000c 20%, #000c 80%, transparent); text-shadow: 0 2px 8px #000; }
+#banner.show { opacity: 1; }
+#banner small { display: block; font-size: 14px; letter-spacing: 2px; color: var(--mut); margin-top: 4px; }
+
+/* 對話框 */
+#dialog { position: absolute; z-index: 40; left: 50%; bottom: 14px; transform: translateX(-50%); width: min(820px, calc(100% - 20px));
+  display: none; gap: 12px; align-items: flex-end; cursor: pointer; }
+#dialog.show { display: flex; }
+#dialog.right { flex-direction: row-reverse; }
+#dialog .portrait { width: 112px; height: 112px; flex: none; border: 2px solid var(--line); border-radius: 8px; background: #000;
+  image-rendering: pixelated; }
+#dialog.noportrait .portrait { display: none; }
+#dialog .box { flex: 1; background: var(--panel); border: 2px solid var(--line); border-radius: 10px; padding: 10px 14px 14px; min-height: 104px; position: relative; }
+#dialog .name { display: inline-block; color: var(--accent); font-weight: bold; margin-bottom: 4px; font-size: 15px; }
+#dialog .text { font-size: 16px; line-height: 1.6; white-space: pre-wrap; }
+#dialog .more { position: absolute; right: 12px; bottom: 6px; color: var(--accent); animation: blink 0.8s infinite; }
+#dialog.center .box { text-align: center; font-style: italic; }
+@keyframes blink { 50% { opacity: 0; } }
+#choices { position: absolute; z-index: 41; left: 50%; top: 30%; transform: translateX(-50%); display: none; flex-direction: column; gap: 8px;
+  min-width: min(460px, calc(100% - 20px)); background: var(--panel); border: 2px solid var(--accent); border-radius: 10px; padding: 12px; }
+#choices.show { display: flex; }
+#choices .prompt { color: var(--accent); margin-bottom: 4px; }
+#choices .btn { font-size: 15px; padding: 10px; text-align: left; }
+
+/* 全畫面 */
+.screen { position: absolute; inset: 0; z-index: 50; background: radial-gradient(ellipse at center, #1a2040 0%, #07080d 75%);
+  display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 20px; text-align: center; overflow: auto; }
+.screen.show { display: flex; }
+.screen h1 { color: var(--accent); font-size: 40px; margin: 0; letter-spacing: 4px; text-shadow: 0 3px 12px #000; }
+.screen h2 { margin: 0; }
+.screen p { color: var(--mut); max-width: 560px; }
+.screen .col { display: flex; flex-direction: column; gap: 8px; min-width: 260px; }
+.screen .btn { font-size: 16px; padding: 10px 18px; }
+.screen select { background: #0a0d16; color: var(--txt); border: 1px solid var(--line); border-radius: 6px; padding: 8px; font-size: 14px; }
+.slot { display: flex; justify-content: space-between; gap: 10px; align-items: center; }
+.slot small { color: var(--mut); }
+
+/* 升級 */
+#levelup { position: absolute; z-index: 45; left: 50%; top: 50%; transform: translate(-50%, -50%); display: none; min-width: 260px; }
+#levelup.show { display: block; }
+#levelup h3 { color: var(--accent); text-align: center; }
+#levelup .stats span.up { color: var(--accent); font-weight: bold; }
+
+#toast { position: absolute; z-index: 60; left: 50%; top: 52px; transform: translateX(-50%); background: var(--panel); border: 1px solid var(--accent);
+  padding: 6px 14px; border-radius: 6px; display: none; }
+#toast.show { display: block; }
+
+@media (max-width: 720px) {
+  #info { width: 170px; top: auto; bottom: 10px; }
+  #forecast { width: calc(100% - 20px); top: auto; bottom: 10px; }
+  #dialog .portrait { width: 72px; height: 72px; }
+}
