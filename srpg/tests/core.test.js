@@ -249,3 +249,11 @@ test('示範第一章：雙方全自動對打能正常結束', () => {
     assert.notEqual(b.status, 'playing', 'seed ' + seed + ' 未結束');
   }
 });
+
+test('條件出場：未說服的角色不會出現在下一章', () => {
+  const c = loadDemo();
+  const b1 = B.createBattle(c, 'ch2a', { flags: {}, seed: 1 });
+  assert.ok(!b1.units.some((u) => u.id === 'kit'));
+  const b2 = B.createBattle(c, 'ch2a', { flags: { kit_joined: true }, seed: 1 });
+  assert.ok(b2.units.some((u) => u.id === 'kit' && u.team === 'player'));
+});

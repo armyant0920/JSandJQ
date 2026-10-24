@@ -24,6 +24,7 @@
     attach(b, campaign);
     for (const p of ch.units || []) {
       if (p.team === 'player' && roster[p.unit] && roster[p.unit].dead) continue;
+      if (p.if && !C.testCond({ if: p.if }, b.flags)) continue; // 條件出場（例如 kit_joined）
       addUnit(b, p, roster);
     }
     return b;

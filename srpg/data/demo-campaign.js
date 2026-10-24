@@ -1012,7 +1012,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "unit": "kit",
      "team": "player",
      "x": 5,
-     "y": 4
+     "y": 4,
+     "if": "kit_joined"
     },
     {
      "unit": "sera",
@@ -1130,7 +1131,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "unit": "kit",
      "team": "player",
      "x": 1,
-     "y": 4
+     "y": 4,
+     "if": "kit_joined"
     },
     {
      "unit": "sera",
@@ -1243,7 +1245,15 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "unit": "kit",
      "team": "player",
      "x": 1,
-     "y": 4
+     "y": 4,
+     "if": "kit_joined"
+    },
+    {
+     "unit": "sera",
+     "team": "player",
+     "x": 0,
+     "y": 2,
+     "if": "sera_joined"
     },
     {
      "unit": "soldier",

@@ -56,6 +56,7 @@
   function frameCount(sp) {
     if (!sp) return 0;
     if (sp.sheet === 'rpgmaker') return 3;
+    if (sp.image && !(sp.frames && sp.frames.length)) return 1;
     return (sp.frames || []).length;
   }
 

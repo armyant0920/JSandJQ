@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SRPG 劇本編輯器</title>
+  <link rel="stylesheet" href="css/editor.css">
+</head>
+<body>
+<div id="ed">
+  <header>
+    <h1>🛠 SRPG 劇本編輯器</h1>
+    <span id="status">—</span>
+    <span class="sp"></span>
+    <button id="btnNewC" title="建立空白劇本">📄 新建</button>
+    <button id="btnDemo" title="載入內建示範劇本">📘 載入示範</button>
+    <button id="btnOpen" title="開啟 campaign.json">📂 開啟檔案</button>
+    <button id="btnExport" title="下載 campaign.json">⬇ 匯出 JSON</button>
+    <button id="btnSaveGame" class="primary" title="存成遊戲標題畫面的「編輯器中的劇本」">💾 存為遊戲劇本</button>
+    <button id="btnPlay" class="primary" title="在新分頁試玩目前章節">▶ 試玩</button>
+    <button id="btnAI" title="產生 AI 協作包（.md）">🤖 AI 協作包</button>
+    <button id="btnAIImport" title="貼上 AI 回傳的 JSON 並合併">⬆ 匯入 AI 回傳</button>
+    <button id="btnCheck" title="檢查劇本錯誤">✔ 檢查</button>
+    <a class="btn" href="index.html" style="text-decoration:none">🎮 遊戲</a>
+  </header>
+  <nav id="tabs"></nav>
+  <main id="main"></main>
+</div>
+
+<div class="modal" id="modal"><div class="card" id="modalBody"></div></div>
+<div id="dialog"><canvas class="portrait" width="112" height="112"></canvas><div class="box"><div class="name"></div><div class="text"></div><span class="more">▼</span></div></div>
+<div id="choices"></div>
+<div id="toast"></div>
+<div id="app" hidden></div><div id="menuLayer" hidden></div><div id="banner" hidden></div><div id="levelup" hidden></div><div id="forecast" hidden></div>
+<div id="unitCard" hidden></div><div id="terrainCard" hidden></div>
+<input type="file" id="fileOpen" accept=".json,application/json" hidden>
+<input type="file" id="fileImg" accept="image/*" hidden>
+
+<script src="js/core/util.js"></script>
+<script src="js/core/campaign.js"></script>
+<script src="js/core/rules.js"></script>
+<script src="js/core/battle.js"></script>
+<script src="js/core/script.js"></script>
+<script src="js/render/sprites.js"></script>
+<script src="js/render/renderer.js"></script>
+<script src="data/demo-campaign.js"></script>
+<script src="js/ui/ui.js"></script>
+<script src="js/editor/common.js"></script>
+<script src="js/editor/db.js"></script>
+<script src="js/editor/map.js"></script>
+<script src="js/editor/pixel.js"></script>
+<script src="js/editor/scripts.js"></script>
+<script src="js/editor/ai.js"></script>
+<script src="js/editor/main.js"></script>
+</body>
+</html>
