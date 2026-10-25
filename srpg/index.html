@@ -2,7 +2,12 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0d0f17">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/app-icon-192.png">
+  <link rel="apple-touch-icon" href="assets/app-icon-192.png">
   <title>SRPG 戰棋</title>
   <link rel="stylesheet" href="css/game.css">
 </head>
@@ -23,6 +28,7 @@
 
   <div id="info"><div class="card" id="unitCard" hidden></div><div class="card" id="terrainCard" hidden></div></div>
   <div class="card" id="forecast" hidden></div>
+  <button class="btn" id="fabCancel" hidden title="取消（Esc / 右鍵）">✕ 取消</button>
   <div id="menuLayer"></div>
   <div id="banner"></div>
 
@@ -49,7 +55,7 @@
       <button class="btn" id="btnSettings">⚙ 設定</button>
       <a class="btn" href="editor.html" style="text-decoration:none">🛠 開啟編輯器</a>
     </div>
-    <p style="font-size:12px">操作：點選/方向鍵移動游標，Enter/Z 確定，Esc/X/右鍵 取消，E 結束回合，D 危險範圍</p>
+    <p style="font-size:12px">操作：點選/方向鍵移動游標，Enter/Z 確定，Esc/X/右鍵/✕ 取消，E 結束回合，D 危險範圍<br>手機：點選操作、長按看範圍、點下方資訊列可展開、拖曳捲動地圖</p>
   </div>
   <div class="screen" id="slotScreen"></div>
   <div class="screen" id="endScreen"></div>

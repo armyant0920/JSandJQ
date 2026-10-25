@@ -66,6 +66,8 @@
   /* 地圖縮放：0 = 符合畫面，其餘為倍率；鏡頭跟隨 */
   const ZOOMS = [0, 0.75, 1, 1.25, 1.5, 2];
   function applyZoom() {
+    // 手機第一次開啟時預設 0.75 倍（格子約 36px，比「符合畫面」好點）
+    if (SET.get('zoom') == null && window.innerWidth < 720) SET.set('zoom', 0.75);
     const z = SET.get('zoom') || 0;
     canvas.classList.toggle('zoomed', z > 0);
     canvas.style.width = z > 0 ? Math.round(canvas.width * z) + 'px' : '';
@@ -150,6 +152,7 @@
     $('objective').textContent = '勝利：' + B.objectiveText(b.chapter) + (b.chapter.fog ? '　🌫 霧戰' : '');
     $('goldInfo').hidden = false; $('goldInfo').textContent = '💰 ' + G.gold;
     const myTurn = b.phase === 'player' && b.status === 'playing' && G.mode === 'idle';
+    $('fabCancel').hidden = !['move', 'target', 'canto'].includes(G.mode);
     $('btnEnd').disabled = !myTurn;
     $('btnDanger').classList.toggle('primary', G.dangerAll);
     G.dangerTiles = null;
@@ -476,7 +479,7 @@
       G.sel = me.uid; G.targets = null; G.targetKind = null; G.threat = null;
       G.reach = R.reachable(b, me, me.cantoMove);
       G.mode = 'canto'; setCursor(me.x, me.y);
-      UI.toast(`再移動（剩 ${me.cantoMove}）：選擇位置，Esc 留在原地`);
+      UI.toast(`再移動（剩 ${me.cantoMove}）：選擇位置，Esc 或 ✕ 留在原地`);
       updateHud();
       return;
     }
@@ -622,6 +625,8 @@
     $('btnSetClose').onclick = () => UI.screen('settingsScreen', false);
   }
   $('btnSettings').onclick = showSettings;
+  $('fabCancel').onclick = () => { if (!UI.busy()) cancel(); };
+  $('info').addEventListener('click', () => $('info').classList.toggle('expanded'));
   $('btnZoomIn').onclick = () => zoomStep(1);
   $('btnZoomOut').onclick = () => zoomStep(-1);
   $('btnZoomFit').onclick = () => { SET.set('zoom', 0); applyZoom(); };
@@ -787,7 +792,7 @@
       case 'attack': {
         const ts = B.targetsFrom(b, me).filter(visible);
         if (!ts.length) { UI.toast('看不到可攻擊的目標'); return actionMenu(me); }
-        return pickTarget('attack', ts, '選擇攻擊目標（Esc 取消）');
+        return pickTarget('attack', ts, '選擇攻擊目標（Esc 或 ✕ 取消）');
       }
       case 'mapAttack': {
         const ws = R.mapWeapons(b, me);
@@ -799,10 +804,10 @@
         }
         G.mapW = pickW;
         const shape = pickW.w.map.shape === 'line' ? '選擇方向' : '選擇中心點';
-        return pickTarget('map', R.mapCenters(b, me, pickW.w), `${pickW.w.name}：${shape}（橘色為影響範圍，Esc 取消）`);
+        return pickTarget('map', R.mapCenters(b, me, pickW.w), `${pickW.w.name}：${shape}（橘色為影響範圍，Esc 或 ✕ 取消）`);
       }
-      case 'rescue': return pickTarget('rescue', B.rescueTargets(b, me), '選擇要救出的同伴（Esc 取消）');
-      case 'drop': return pickTarget('drop', B.dropTiles(b, me), '選擇放下的位置（Esc 取消）');
+      case 'rescue': return pickTarget('rescue', B.rescueTargets(b, me), '選擇要救出的同伴（Esc 或 ✕ 取消）');
+      case 'drop': return pickTarget('drop', B.dropTiles(b, me), '選擇放下的位置（Esc 或 ✕ 取消）');
       case 'support': {
         const ps = B.supportTargets(b, me);
         let other = ps[0];
@@ -817,7 +822,7 @@
         if (nr) await UI.banner(`支援 ${nr.rank}`, `${me.name} ＆ ${other.name}`, '#ffb3f0', 1000);
         return postAction(me);
       }
-      case 'staff': return pickTarget('heal', B.healTargets(b, me), '選擇治療對象（Esc 取消）');
+      case 'staff': return pickTarget('heal', B.healTargets(b, me), '選擇治療對象（Esc 或 ✕ 取消）');
       case 'spirit': {
         const list = B.spiritsUsable(b, me).map((s) => ({ id: s.id, name: s.name, note: 'SP ' + (s.cost || 0), title: s.desc || '', disabled: (s.cost || 0) > me.sp }));
         const sid = await menuAt(list);
@@ -836,7 +841,7 @@
           const ts = B.spiritTargets(b, me, sid);
           if (!ts.length) { UI.toast('沒有可選的同伴'); return actionMenu(me); }
           G.targetCb = (t) => { G.targetKind = null; apply(t); };
-          return pickTarget('spirit', ts, `${sp.name}：選擇同伴（Esc 取消）`);
+          return pickTarget('spirit', ts, `${sp.name}：選擇同伴（Esc 或 ✕ 取消）`);
         }
         return apply();
       }
@@ -902,6 +907,7 @@
     const id = await UI.menu([
       { id: 'end', name: '⏭ 結束回合' },
       { id: 'danger', name: (G.dangerAll ? '隱藏' : '顯示') + '危險範圍' },
+      ...(window.innerWidth < 720 ? [{ id: 'zin', name: '🔍 放大地圖' }, { id: 'zout', name: '🔍 縮小地圖' }, { id: 'zfit', name: '⤢ 符合畫面' }] : []),
       { id: 'save', name: '💾 中斷存檔' },
       { id: 'settings', name: '⚙ 設定' },
       { id: 'title', name: '↩ 回到標題' },
@@ -911,6 +917,9 @@
     else if (id === 'danger') G.dangerAll = !G.dangerAll;
     else if (id === 'save') showSaveScreen('中斷存檔', true, null);
     else if (id === 'settings') showSettings();
+    else if (id === 'zin') zoomStep(1);
+    else if (id === 'zout') zoomStep(-1);
+    else if (id === 'zfit') { SET.set('zoom', 0); applyZoom(); }
     else if (id === 'title' && confirm('回到標題？未存檔的進度會遺失。')) showTitle();
     updateHud();
   }

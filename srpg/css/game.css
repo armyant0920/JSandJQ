@@ -161,3 +161,28 @@ button { font-family: inherit; }
 .scene-wrap.overlay { background: transparent; pointer-events: none; }
 #stage.shake { animation: stageShake 0.08s linear infinite; }
 @keyframes stageShake { 0% { transform: translate(4px, 2px); } 50% { transform: translate(-4px, -2px); } 100% { transform: translate(2px, -3px); } }
+
+/* ===== 手機 / 觸控 ===== */
+html, body { touch-action: manipulation; }
+#stage { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
+#fabCancel { position: fixed; z-index: 35; right: 14px; bottom: 18px; font-size: 15px; padding: 10px 16px; border-color: var(--red); color: #ffb3b3; box-shadow: 0 4px 16px #000a; }
+@media (max-width: 720px) {
+  #topbar { gap: 5px; padding: 4px 8px; min-height: 0; }
+  #topbar .title { font-size: 13px; }
+  #topbar .pill { font-size: 11px; padding: 1px 7px; }
+  #topbar .sp { display: none; }
+  #topbar .btn { padding: 5px 9px; font-size: 12px; }
+  #zoomCtl, #btnDanger { display: none; }
+  #stage { padding: 6px 6px 96px; justify-content: flex-start; }
+  #info { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: auto; flex-direction: row; align-items: flex-start; gap: 6px;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); background: #070910f0; border-top: 1px solid var(--line); pointer-events: auto; z-index: 6; max-height: 50vh; overflow: auto; }
+  #info .card { margin: 0; padding: 4px 8px; font-size: 11px; }
+  #unitCard { flex: 1; }
+  #terrainCard { flex: 0 0 auto; max-width: 40%; }
+  #info:not(.expanded) #unitCard .stats, #info:not(.expanded) #unitCard .inv, #info:not(.expanded) #unitCard .skills,
+  #info:not(.expanded) #unitCard .res, #info:not(.expanded) #unitCard .buffs { display: none; }
+  #info:not(.expanded) #unitCard h3::after { content: ' ▲ 點擊展開'; font-size: 10px; color: var(--mut); font-weight: normal; }
+  #fabCancel { bottom: 104px; }
+  .menu .btn { padding: 10px 12px; font-size: 14px; }
+  #forecast { z-index: 36; }
+}

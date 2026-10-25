@@ -76,5 +76,14 @@
 - `assets/characters.png`：RPG Maker 規格行走圖（開源素材），示範劇本角色使用；編輯器「精靈圖」分頁可一鍵加入。
 - `assets/icons.png`：kyrise（kyrise.itch.io）圖示包，武器/道具圖示；編輯器中點「選擇…」挑圖示。
 
+## 手機遊玩
+- 支援手機/平板瀏覽器：點選操作、長按看範圍、拖曳捲動地圖；移動/選目標/再移動時右下角有「✕ 取消」按鈕。
+- 下方資訊列預設精簡，點一下展開完整能力與持有物；地圖縮放在「☰ 選單」中。
+- 可「加入主畫面」以全螢幕開啟（PWA manifest）。編輯器建議在電腦或平板上使用。
+
+## 放到 GitHub Pages
+純靜態網站，不需建置：Repo → Settings → Pages → Source 選「Deploy from a branch」→ 選分支、資料夾選 `/ (root)` → 儲存。
+網址為 `https://<帳號>.github.io/<repo>/`，根目錄 `index.html` 會自動轉到 `srpg/`。（私人 repo 需付費方案才能開 Pages。）
+
 ## 本機伺服器（選用）
 直接雙擊即可運作。若想用 http 開啟：`python -m http.server 8080` → `http://localhost:8080/srpg/`。
