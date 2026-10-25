@@ -1,0 +1,468 @@
+import json
+import os
+HERE=os.path.dirname(os.path.abspath(__file__))
+SP=json.load(open(os.path.join(HERE,'sprites.json')))
+PAL={"o":"#1c1c28","h":"#7a4a22","s":"#f2c79a","e":"#1c1c28","T":"team","t":"teamDark","w":"#d6dbe4","b":"#7a5230","y":"#ffe25a","n":"#c8b49a"}
+def shift(rows, dx, dy=0):
+    out=[]
+    for y in range(16):
+        sy=y-dy
+        r=rows[sy] if 0<=sy<16 else '.'*16
+        out.append(('.'*dx+r)[:16] if dx>=0 else (r[-dx:]+'.'*(-dx)))
+    return out
+# 每個 ASCII 精靈：待機(0)、待機呼吸(1)、攻擊前傾(2)、受擊後仰(3)
+sprites={k:{"name":k,"w":16,"h":16,"palette":PAL,"frames":[v, shift(v,0,1), shift(v,2), shift(v,-1)],"poses":{"attack":[2],"hurt":[3]},"fps":2} for k,v in SP.items()}
+CHARA_NAMES=["藍衣少女","銀髮少女","狐耳少女","綠帽少女","魔女","紅白巫女","紅髮武人","金髮少女"]
+for i,n in enumerate(CHARA_NAMES):
+    sprites["chara_%d"%i]={"name":n,"image":"assets/characters.png","sheet":"rpgmaker","index":i,"frameW":36,"frameH":36}
+def u(name,cls,lv,stats_,gr,wp,**kw):
+    d={"name":name,"class":cls,"level":lv,"stats":dict(zip(["hp","str","mag","skl","spd","lck","def","res"],stats_)),"weapons":wp}
+    if gr: d["growth"]=dict(zip(["hp","str","mag","skl","spd","lck","def","res"],gr))
+    d.update(kw); return d
+C={
+"format":"srpg-campaign","version":1,
+"meta":{"title":"邊境的晨星（示範劇本）","author":"SRPG Demo","start":"ch1","permadeath":True,
+        "rules":{"morale":True,"spirits":True,"resources":True,"upgrades":True},
+        "desc":"內建示範：5 章、轉職與改造、劇情分歧、說服、拜訪、增援；杖、道具、交換、救出、再移動、被動技能、體力/法力、地圖兵器、支援對話、出擊準備與商店、霧戰、精神指令、氣力。"},
+"weapons":{
+ "iron_sword":{"name":"鐵劍","type":"sword","dmg":"phys","mt":5,"hit":90,"crit":0,"range":[1,1],"icon":296,"price":400},
+ "slim_sword":{"name":"細劍","type":"sword","dmg":"phys","mt":3,"hit":100,"crit":5,"range":[1,1],"icon":287,"price":500},
+ "killing_edge":{"name":"殺劍","type":"sword","dmg":"phys","mt":9,"hit":75,"crit":30,"range":[1,1],"icon":294,"cost":2,"price":1800},
+ "brave_sword":{"name":"勇者之劍","type":"sword","dmg":"phys","mt":8,"hit":75,"crit":0,"range":[1,1],"brave":True,"icon":298,"cost":3,"price":3000},
+ "meteor":{"anim":"special_meteor","name":"流星斬","type":"sword","dmg":"phys","mt":14,"hit":85,"crit":10,"range":[1,1],"morale":115,"icon":299,"desc":"氣力 115 以上才能使用的必殺技","cost":6},
+ "iron_lance":{"anim":"charge","name":"鐵槍","type":"lance","dmg":"phys","mt":7,"hit":80,"crit":0,"range":[1,1],"icon":270,"price":450},
+ "javelin":{"name":"標槍","type":"lance","dmg":"phys","mt":6,"hit":65,"crit":0,"range":[1,2],"icon":271,"cost":1,"price":600},
+ "iron_axe":{"name":"鐵斧","type":"axe","dmg":"phys","mt":8,"hit":75,"crit":0,"range":[1,1],"icon":290,"price":400},
+ "hand_axe":{"name":"手斧","type":"axe","dmg":"phys","mt":7,"hit":60,"crit":0,"range":[1,2],"icon":285,"cost":1,"price":600},
+ "iron_bow":{"name":"鐵弓","type":"bow","dmg":"phys","mt":6,"hit":85,"crit":0,"range":[2,2],"effective":["fly"],"icon":57,"price":500},
+ "fire":{"name":"火焰","type":"anima","dmg":"mag","mt":5,"hit":90,"crit":0,"range":[1,2],"icon":263,"cost":2,"price":500},
+ "thunder":{"anim":"magic_thunder","name":"雷擊","type":"anima","dmg":"mag","mt":8,"hit":75,"crit":5,"range":[1,2],"icon":256,"cost":4,"price":900},
+ "heal_staff":{"name":"治療杖","type":"staff","dmg":"mag","heal":10,"range":[1,1],"icon":278,"cost":3,"price":600},
+ "firestorm":{"name":"火焰風暴","type":"anima","dmg":"mag","mt":6,"hit":80,"crit":0,"range":[1,3],"map":{"shape":"burst","size":1},"cost":8,"morale":110,"icon":268,"desc":"地圖兵器：範圍 1 的爆炸，需要氣力 110"},
+ "quake_lance":{"name":"震地槍","type":"lance","dmg":"phys","mt":5,"hit":75,"morale":115,"crit":0,"range":[1,1],"map":{"shape":"line","size":3},"cost":8,"icon":274,"desc":"地圖兵器：直線 3 格"},
+ "long_bow":{"name":"長弓","type":"bow","dmg":"phys","mt":7,"hit":75,"crit":0,"range":[2,3],"effective":["fly"],"icon":59,"anim":"volley","cost":2,"price":1600},
+ "silver_lance":{"name":"銀槍","type":"lance","dmg":"phys","mt":11,"hit":80,"crit":0,"range":[1,1],"icon":271,"anim":"charge","cost":2,"price":2000},
+ "dark_flux":{"name":"闇之波動","type":"dark","dmg":"mag","mt":9,"hit":75,"crit":0,"range":[1,2],"icon":259,"anim":"magic_dark","cost":3,"price":1400},
+ "shadow_wave":{"name":"暗影潮","type":"dark","dmg":"mag","mt":5,"hit":75,"morale":115,"crit":0,"range":[1,3],"map":{"shape":"burst","size":1},"cost":8,"icon":264,"desc":"地圖兵器"},
+ "physic":{"name":"遠距治療杖","type":"staff","dmg":"mag","heal":8,"range":[1,3],"icon":281,"cost":5,"price":1500}
+},
+"items":{
+ "master_seal":{"name":"騎士勳章","kind":"promote","uses":1,"icon":175,"price":2500,"desc":"Lv5 以上可轉職為上級職業"},
+ "ether":{"name":"魔力水","kind":"mp","power":10,"uses":2,"icon":218,"price":500,"desc":"回復 10 MP"},
+ "tonic":{"name":"提神藥","kind":"st","power":10,"uses":2,"icon":219,"price":400,"desc":"回復 10 體力"},
+ "vulnerary":{"name":"傷藥","kind":"heal","power":10,"uses":3,"icon":217,"price":300,"desc":"回復 10 HP"},
+ "elixir":{"name":"萬靈藥","kind":"heal","power":99,"uses":1,"icon":225,"price":1200,"desc":"HP 全回復"},
+ "power_ring":{"name":"力量戒指","kind":"boost","stat":"str","power":2,"uses":1,"icon":233,"price":3000,"desc":"力量永久 +2"},
+ "sp_potion":{"name":"SP 回復藥","kind":"sp","power":20,"uses":1,"icon":229,"price":800,"desc":"SP +20"}
+},
+"classes":{
+ "lord":{"name":"領主","move":5,"moveType":"foot","sprite":"swordsman","promote":[{"to":"high_lord","level":5,"item":"master_seal","bonus":{"hp":4,"str":2,"skl":2,"spd":1,"def":2,"res":2,"st":5}}]},
+ "high_lord":{"name":"晨星領主","move":6,"moveType":"foot","sprite":"swordsman","skills":["pursuit"]},
+ "paladin":{"name":"聖騎士","move":8,"moveType":"horse","sprite":"cavalier","tags":["horse"],"skills":["canto","guard"]},
+ "sniper":{"name":"狙擊手","move":5,"moveType":"foot","sprite":"archer","skills":["keen"]},
+ "sage":{"name":"賢者","move":5,"moveType":"foot","sprite":"mage","skills":["adept"]},
+ "bishop":{"name":"主教","move":5,"moveType":"foot","sprite":"mage","skills":["guard"]},
+ "assassin":{"name":"刺客","move":6,"moveType":"foot","sprite":"swordsman","vision":6,"skills":["luna"]},
+ "falcon":{"name":"獵鷹騎士","move":8,"moveType":"fly","sprite":"pegasus","tags":["fly"],"skills":["canto"],"vision":5},
+ "cavalier":{"name":"騎士","move":7,"moveType":"horse","sprite":"cavalier","tags":["horse"],"skills":["canto"],"promote":[{"to":"paladin","level":5,"item":"master_seal","bonus":{"hp":4,"str":2,"def":3,"res":2,"st":5}}]},
+ "archer":{"name":"弓兵","move":5,"moveType":"foot","sprite":"archer","promote":[{"to":"sniper","level":5,"item":"master_seal","bonus":{"hp":3,"str":2,"skl":3,"spd":1,"def":1,"st":5},"weapons":["long_bow"]}]},
+ "mage":{"name":"魔道士","move":5,"moveType":"foot","sprite":"mage","promote":[{"to":"sage","level":5,"item":"master_seal","bonus":{"hp":3,"mag":3,"skl":1,"spd":1,"res":3,"mp":8},"weapons":["heal_staff"]}]},
+ "fighter":{"name":"戰士","move":5,"moveType":"foot","sprite":"fighter"},
+ "brigand":{"name":"山賊","move":5,"moveType":"foot","sprite":"fighter"},
+ "knight":{"name":"重甲兵","move":4,"moveType":"armor","sprite":"knight","tags":["armor"]},
+ "thief":{"name":"盜賊","move":6,"moveType":"foot","sprite":"swordsman","vision":5,"promote":[{"to":"assassin","level":5,"item":"master_seal","bonus":{"hp":3,"str":2,"skl":2,"spd":2,"def":1,"st":5}}]},
+ "pegasus":{"name":"天馬騎士","move":7,"moveType":"fly","sprite":"pegasus","tags":["fly"],"skills":["canto"],"vision":4,"promote":[{"to":"falcon","level":5,"item":"master_seal","bonus":{"hp":4,"str":2,"spd":2,"def":2,"res":2,"st":5}}]},
+ "soldier":{"name":"士兵","move":5,"moveType":"foot","sprite":"lancer"},
+ "cleric":{"name":"僧侶","move":5,"moveType":"foot","sprite":"mage","promote":[{"to":"bishop","level":5,"item":"master_seal","bonus":{"hp":3,"mag":2,"def":1,"res":3,"mp":10},"weapons":["physic"]}]}
+},
+"units":{
+ "alan":u("艾倫","lord",1,[20,6,1,7,8,6,5,2],[80,45,5,50,55,50,30,25],["iron_sword","meteor"],lord=True,sprite="chara_5",items=["vulnerary"],sp=40,spirits=["strike","valor","guts"],st=20),
+ "mira":u("米菈","cavalier",2,[22,7,0,5,6,4,6,1],[85,45,0,40,40,35,30,15],["iron_lance","javelin"],sprite="chara_6",items=["vulnerary"],sp=35,spirits=["accel","iron_wall","strike"],st=18),
+ "rook":u("魯克","archer",2,[18,6,0,8,6,3,4,1],[70,40,0,55,45,30,20,15],["iron_bow"],sprite="chara_3",sp=30,spirits=["focus","strike","effort"],st=15,skills=["keen"]),
+ "elle":u("艾兒","mage",1,[16,0,7,6,7,5,2,6],[55,0,60,45,50,40,15,40],["fire","firestorm"],sprite="chara_4",items=["sp_potion"],sp=35,spirits=["valor","alert","effort"],mp=24,st=8),
+ "lina":u("莉娜","cleric",1,[16,0,5,4,6,8,1,7],[50,0,50,35,45,60,10,50],["heal_staff"],sprite="chara_0",items=["vulnerary","elixir"],sp=50,spirits=["trust","cheer","alert"],mp=30,st=8),
+ "kit":u("基特","thief",3,[17,4,0,9,12,7,3,1],[60,30,5,45,65,50,15,15],["slim_sword"],sprite="chara_1",items=["vulnerary"],sp=30,spirits=["alert","accel","focus"],st=20,skills=["adept"]),
+ "sera":u("瑟拉","pegasus",4,[19,6,2,9,12,8,5,7],[60,40,15,50,60,45,20,40],["iron_lance","javelin"],sprite="chara_7",sp=40,spirits=["accel","alert","strike"],st=18),
+ "bandit":u("山賊","brigand",2,[22,6,0,2,4,0,3,0],None,["iron_axe"]),
+ "bandit_axe":u("山賊","brigand",3,[23,6,0,2,4,0,3,0],None,["hand_axe"],st=10),
+ "garr":u("加爾","brigand",5,[28,9,0,5,5,2,5,1],None,["iron_axe","hand_axe"],items=["vulnerary"],st=15,skills=["vantage"],spirits=["valor"],sp=30),
+ "soldier":u("帝國兵","soldier",4,[20,5,0,5,5,2,5,1],None,["iron_lance"],st=6),
+ "imp_archer":u("帝國弓兵","archer",4,[19,6,0,7,5,2,4,1],None,["iron_bow"]),
+ "imp_knight":u("帝國重甲","knight",5,[26,8,0,4,2,1,11,0],None,["iron_lance"]),
+ "imp_mage":u("帝國魔道士","mage",4,[17,0,6,5,6,2,2,5],None,["fire"],mp=12),
+ "imp_pegasus":u("帝國天馬","pegasus",6,[19,6,1,7,9,3,5,6],None,["iron_lance","javelin"],st=10),
+ "imp_sniper":u("帝國狙擊手","sniper",3,[23,7,0,9,7,3,5,3],None,["long_bow"],st=12),
+ "imp_paladin":u("帝國聖騎士","paladin",3,[28,9,0,7,7,3,9,4],None,["silver_lance","javelin"],st=14),
+ "helga":u("闇術師赫爾加","sage",5,[28,0,11,9,8,4,6,9],None,["dark_flux","shadow_wave"],mp=40,skills=["vantage"],spirits=["focus","iron_wall"],sp=40,morale=110,sprite="mage"),
+ "emperor":u("皇帝傑羅斯","high_lord",8,[36,12,3,10,9,6,10,6],None,["killing_edge","silver_lance"],st=40,skills=["sol"],spirits=["valor","strike"],sp=60,morale=110,items=["elixir"]),
+ "imp_cleric":u("帝國僧侶","cleric",4,[17,0,5,4,5,3,2,6],None,["heal_staff"],mp=15),
+ "voss":u("沃斯將軍","knight",7,[28,10,0,7,4,3,7,2],None,["iron_lance","javelin","quake_lance"],items=["elixir"],sprite="chara_2",st=30,skills=["luna"],spirits=["valor","strike"],sp=40,morale=105)
+},
+"sprites":sprites,
+"portraits":{},
+"chapters":{
+ "ch1":{"name":"第一章 邊境之村",
+  "map":{"rows":[
+   "MMMM....FF....MM",
+   "MM...F.......FMM",
+   "M..==========..M",
+   "...=..V.....=...",
+   ".F.=....FF..=..F",
+   "...=..FFFF..=...",
+   "..T=........=.T.",
+   "...=..~~~...=...",
+   ".F.=..~~~..V=...",
+   "...==========...",
+   "FF......FF....MM"]},
+  "units":[
+   {"unit":"alan","team":"player","x":1,"y":8},
+   {"unit":"mira","team":"player","x":2,"y":9},
+   {"unit":"rook","team":"player","x":0,"y":7},
+   {"unit":"elle","team":"player","x":1,"y":9},
+   {"unit":"lina","team":"player","x":0,"y":8},
+   {"unit":"bandit","team":"enemy","x":8,"y":4,"ai":"aggressive"},
+   {"unit":"bandit","team":"enemy","x":11,"y":6,"ai":"aggressive"},
+   {"unit":"bandit_axe","team":"enemy","x":12,"y":3,"ai":"guard"},
+   {"unit":"kit","team":"enemy","x":6,"y":4,"ai":"guard"},
+   {"unit":"garr","team":"enemy","x":13,"y":6,"ai":"hold","boss":True}],
+  "victory":{"type":"boss"},"defeat":{"type":"lordDies"},
+  "events":[
+   {"on":"start","script":"ch1_intro"},
+   {"on":"talk","a":"alan","b":"kit","script":"ch1_kit"},
+   {"on":"visit","x":6,"y":3,"script":"ch1_village"},
+   {"on":"visit","x":11,"y":8,"script":"ch1_village2"},
+   {"on":"turn","turn":3,"phase":"enemy","script":"ch1_reinf"},
+   {"on":"death","unit":"garr","script":"ch1_garr"},
+   {"on":"victory","script":"ch1_end"}],
+  "next":[{"if":"route_forest","chapter":"ch2a"},{"chapter":"ch2b"}]},
+ "ch2a":{"name":"第二章 迷霧森林","fog":True,"prep":True,"shop":["vulnerary","elixir","ether","tonic","iron_sword","slim_sword","iron_lance","javelin","fire","thunder","heal_staff","physic"],
+  "map":{"rows":[
+   "FFFF..FFFFF..FFF",
+   "F..FF...F...FF.F",
+   "F...F.FFF.F....F",
+   "..F....F....FF..",
+   ".FFF.T...F...F..",
+   "..F...FF...FF...",
+   "F...F....F...F.F",
+   "FF....FF...F....",
+   "F..F.F...FF..F.F",
+   "FFF...FF....FFFF"]},
+  "units":[
+   {"unit":"alan","team":"player","x":7,"y":5},
+   {"unit":"mira","team":"player","x":6,"y":4},
+   {"unit":"rook","team":"player","x":8,"y":4},
+   {"unit":"elle","team":"player","x":7,"y":4},
+   {"unit":"lina","team":"player","x":8,"y":5},
+   {"unit":"kit","team":"player","x":5,"y":4,"if":"kit_joined"},
+   {"unit":"sera","team":"ally","x":1,"y":3,"ai":"aggressive"},
+   {"unit":"soldier","team":"enemy","x":0,"y":0},
+   {"unit":"soldier","team":"enemy","x":15,"y":0},
+   {"unit":"imp_archer","team":"enemy","x":14,"y":3},
+   {"unit":"imp_mage","team":"enemy","x":15,"y":8},
+   {"unit":"soldier","team":"enemy","x":1,"y":9}],
+  "victory":{"type":"survive","turns":5},"defeat":{"type":"lordDies"},
+  "events":[
+   {"on":"start","script":"ch2a_intro"},
+   {"on":"talk","a":"alan","b":"sera","script":"ch2_sera"},
+   {"on":"turn","turn":2,"phase":"enemy","script":"ch2a_reinf"},
+   {"on":"victory","script":"ch2_end"}],
+  "next":["ch3"]},
+ "ch2b":{"name":"第二章 王道關所","prep":True,"shop":["vulnerary","elixir","ether","tonic","iron_sword","slim_sword","iron_lance","javelin","fire","thunder","heal_staff","physic"],
+  "map":{"rows":[
+   "####..######..##",
+   "#..#..#....#..#.",
+   "....==========..",
+   "..T.=........=..",
+   "....=..FF....=K.",
+   "....=..FF....=..",
+   "..T.=........=..",
+   "....==========..",
+   "#..#..#....#..#.",
+   "####..######..##"]},
+  "units":[
+   {"unit":"alan","team":"player","x":0,"y":5,"forced":True},
+   {"unit":"mira","team":"player","x":1,"y":4},
+   {"unit":"rook","team":"player","x":0,"y":3},
+   {"unit":"elle","team":"player","x":1,"y":6},
+   {"unit":"lina","team":"player","x":0,"y":6},
+   {"unit":"kit","team":"player","x":1,"y":4,"if":"kit_joined"},
+   {"unit":"sera","team":"enemy","x":9,"y":1,"ai":"hold"},
+   {"unit":"soldier","team":"enemy","x":7,"y":3},
+   {"unit":"soldier","team":"enemy","x":8,"y":6},
+   {"unit":"imp_archer","team":"enemy","x":11,"y":3},
+   {"unit":"imp_knight","team":"enemy","x":12,"y":5,"ai":"hold"},
+   {"unit":"imp_mage","team":"enemy","x":12,"y":7},
+   {"unit":"imp_cleric","team":"enemy","x":13,"y":4,"ai":"guard"}],
+  "victory":{"type":"seize","x":14,"y":4},"defeat":{"type":"lordDies"},
+  "events":[
+   {"on":"start","script":"ch2b_intro"},
+   {"on":"talk","a":"alan","b":"sera","script":"ch2_sera"},
+   {"on":"victory","script":"ch2_end"}],
+  "next":["ch3"]},
+ "ch3":{"name":"第三章 晨星之誓","prep":True,"shop":["vulnerary","elixir","ether","tonic","iron_sword","slim_sword","iron_lance","javelin","fire","thunder","heal_staff","physic","killing_edge","brave_sword"],"deploySlots":[{"x":2,"y":3},{"x":2,"y":5}],
+  "map":{"rows":[
+   "MMM..FF....FFMMM",
+   "M....F..==....MM",
+   "..==========...M",
+   "..=..T....=....M",
+   "..=.......=.K...",
+   "..=..FF...=.....",
+   "..==========...M",
+   "M......FF......M",
+   "MM..~~~....~~~MM"]},
+  "units":[
+   {"unit":"alan","team":"player","x":0,"y":3},
+   {"unit":"mira","team":"player","x":0,"y":4},
+   {"unit":"rook","team":"player","x":1,"y":2},
+   {"unit":"elle","team":"player","x":1,"y":5},
+   {"unit":"lina","team":"player","x":0,"y":5},
+   {"unit":"kit","team":"player","x":1,"y":4,"if":"kit_joined"},
+   {"unit":"sera","team":"player","x":0,"y":2,"if":"sera_joined"},
+   {"unit":"soldier","team":"enemy","x":7,"y":2},
+   {"unit":"soldier","team":"enemy","x":8,"y":6},
+   {"unit":"imp_archer","team":"enemy","x":10,"y":3},
+   {"unit":"imp_mage","team":"enemy","x":10,"y":5},
+   {"unit":"imp_knight","team":"enemy","x":11,"y":4,"ai":"hold"},
+   {"unit":"imp_cleric","team":"enemy","x":13,"y":5,"ai":"guard"},
+   {"unit":"voss","team":"enemy","x":12,"y":4,"ai":"hold","boss":True}],
+  "victory":{"type":"boss"},"defeat":{"type":"lordDies"},
+  "events":[
+   {"on":"start","script":"ch3_intro"},
+   {"on":"death","unit":"voss","script":"ch3_voss"},
+   {"on":"victory","script":"ch3_end"}],
+  "next":["ch4"]},
+ "ch4":{"name":"第四章 斷崖峽谷","prep":True,"shop":["vulnerary","elixir","ether","tonic","master_seal","iron_sword","killing_edge","brave_sword","silver_lance","long_bow","fire","thunder","dark_flux","heal_staff","physic"],"deploySlots":[{"x":1,"y":2},{"x":2,"y":7}],
+  "map":{"rows":[
+   "MMMMM...MMMMMMMM",
+   "MM....F....F..MM",
+   "M..F.....==...MM",
+   "...==========...",
+   "..=..FF..M..=.T.",
+   "..=..FF.MM..=...",
+   "...==========...",
+   "M...F....F....MM",
+   "MM......~~~..MMM",
+   "MMMMM..~~~~MMMMM"]},
+  "units":[
+   {"unit":"alan","team":"player","x":0,"y":4,"forced":True},
+   {"unit":"mira","team":"player","x":0,"y":5},
+   {"unit":"rook","team":"player","x":1,"y":3},
+   {"unit":"elle","team":"player","x":1,"y":6},
+   {"unit":"lina","team":"player","x":0,"y":3},
+   {"unit":"kit","team":"player","x":1,"y":5,"if":"kit_joined"},
+   {"unit":"sera","team":"player","x":0,"y":6,"if":"sera_joined"},
+   {"unit":"soldier","team":"enemy","x":7,"y":3,"level":7},
+   {"unit":"soldier","team":"enemy","x":8,"y":6,"level":7},
+   {"unit":"imp_archer","team":"enemy","x":9,"y":2,"level":7},
+   {"unit":"imp_mage","team":"enemy","x":10,"y":5,"level":7},
+   {"unit":"imp_knight","team":"enemy","x":12,"y":4,"ai":"hold","level":7},
+   {"unit":"imp_cleric","team":"enemy","x":13,"y":5,"ai":"guard"},
+   {"unit":"imp_sniper","team":"enemy","x":11,"y":1,"ai":"hold"},
+   {"unit":"helga","team":"enemy","x":14,"y":4,"ai":"hold","boss":True}],
+  "victory":{"type":"boss"},"defeat":{"type":"lordDies"},
+  "events":[
+   {"on":"start","script":"ch4_intro"},
+   {"on":"turn","turn":3,"phase":"enemy","script":"ch4_reinf"},
+   {"on":"death","unit":"helga","script":"ch4_helga"},
+   {"on":"victory","script":"ch4_end"}],
+  "next":["ch5"]},
+ "ch5":{"name":"終章 帝都決戰","prep":True,"shop":["vulnerary","elixir","ether","tonic","master_seal","iron_sword","killing_edge","brave_sword","silver_lance","long_bow","fire","thunder","dark_flux","heal_staff","physic"],"deploySlots":[{"x":1,"y":4},{"x":1,"y":6}],
+  "map":{"rows":[
+   "##################",
+   "#....#......#....#",
+   "#.T..#..==..#..K.#",
+   "#....=..==..=....#",
+   "#..====....====..#",
+   "....=..........=..",
+   "#..====....====..#",
+   "#....=..==..=....#",
+   "#.T..#..==..#....#",
+   "#....#......#....#",
+   "##################"]},
+  "units":[
+   {"unit":"alan","team":"player","x":0,"y":5,"forced":True},
+   {"unit":"mira","team":"player","x":1,"y":5},
+   {"unit":"rook","team":"player","x":2,"y":3},
+   {"unit":"elle","team":"player","x":2,"y":7},
+   {"unit":"lina","team":"player","x":2,"y":5},
+   {"unit":"kit","team":"player","x":3,"y":5,"if":"kit_joined"},
+   {"unit":"sera","team":"player","x":3,"y":3,"if":"sera_joined"},
+   {"unit":"imp_paladin","team":"enemy","x":8,"y":5},
+   {"unit":"imp_knight","team":"enemy","x":9,"y":3,"ai":"guard","level":8},
+   {"unit":"imp_sniper","team":"enemy","x":12,"y":5,"ai":"hold"},
+   {"unit":"imp_mage","team":"enemy","x":13,"y":2,"level":9},
+   {"unit":"imp_cleric","team":"enemy","x":14,"y":3,"ai":"guard","level":7},
+   {"unit":"soldier","team":"enemy","x":13,"y":8,"level":9},
+   {"unit":"emperor","team":"enemy","x":15,"y":2,"ai":"hold","boss":True}],
+  "victory":{"type":"seize","x":15,"y":2},"defeat":{"type":"lordDies"},
+  "events":[
+   {"on":"start","script":"ch5_intro"},
+   {"on":"turn","turn":4,"phase":"enemy","script":"ch5_reinf"},
+   {"on":"death","unit":"emperor","script":"ch5_emperor"},
+   {"on":"victory","script":"ch5_end"}],
+  "next":[]}
+},
+"supports":{
+ "alan_mira":{"a":"alan","b":"mira","ranks":[{"rank":"C","need":2,"script":"sup_alan_mira_c"},{"rank":"B","need":5,"script":"sup_alan_mira_b"},{"rank":"A","need":9,"script":"sup_alan_mira_a"}]},
+ "elle_lina":{"a":"elle","b":"lina","ranks":[{"rank":"C","need":2,"script":"sup_elle_lina_c"},{"rank":"B","need":5,"script":"sup_elle_lina_b"}]},
+ "rook_kit":{"a":"rook","b":"kit","ranks":[{"rank":"C","need":3,"script":"sup_rook_kit_c"}]}
+},
+"scripts":{
+ "ch4_intro":[
+  {"cmd":"narrate","text":"帝國軍撤退到斷崖峽谷，闇術師赫爾加在此布陣。"},
+  {"cmd":"say","who":"mira","text":"艾倫大人，這是在沃斯將軍營帳找到的騎士勳章。等級夠的人就能轉職成上級職業。"},
+  {"cmd":"give","unit":"alan","item":"master_seal"},
+  {"cmd":"gold","add":3000},
+  {"cmd":"say","who":"alan","side":"right","text":"出擊準備時也能用軍資金「改造」武器與能力……大家做好準備！"},
+  {"cmd":"narrate","text":"【提示】轉職：Lv5 以上在戰鬥中對自己使用「騎士勳章」。改造：出擊準備畫面的「改造」分頁。"}],
+ "ch4_reinf":[
+  {"cmd":"say","who":"helga","text":"呵呵……天馬隊，從斷崖上包抄他們！"},
+  {"cmd":"spawn","units":[{"unit":"imp_pegasus","team":"enemy","x":15,"y":0}]}],
+ "ch4_helga":[
+  {"cmd":"say","who":"helga","text":"皇帝陛下……臣……"},
+  {"cmd":"gold","add":2500}],
+ "ch4_end":[
+  {"cmd":"say","who":"alan","side":"right","text":"前面就是帝都。結束這一切吧。"}],
+ "ch5_intro":[
+  {"cmd":"narrate","text":"帝都・皇城。皇帝傑羅斯坐鎮王座。"},
+  {"cmd":"say","who":"emperor","text":"邊境的小鬼，你以為憑那點人就能改變這個國家？"},
+  {"cmd":"say","who":"alan","side":"right","text":"改變它的不是我，是所有不想再打仗的人！"},
+  {"cmd":"narrate","text":"【勝利條件】擊敗皇帝後，由艾倫壓制王座(K)。"}],
+ "ch5_reinf":[
+  {"cmd":"say","who":"emperor","text":"近衛隊，出擊！"},
+  {"cmd":"spawn","units":[{"unit":"imp_paladin","team":"enemy","x":16,"y":5},{"unit":"imp_sniper","team":"enemy","x":16,"y":8}]}],
+ "ch5_emperor":[
+  {"cmd":"say","who":"emperor","text":"……原來，這就是晨星的光嗎……"}],
+ "ch5_end":[
+  {"cmd":"narrate","text":"王座被壓制，長年的戰火終於熄滅。"},
+  {"cmd":"if","flag":"sera_joined","goto":"sera"},
+  {"cmd":"goto","label":"k"},
+  {"cmd":"label","name":"sera"},
+  {"cmd":"say","who":"sera","text":"天馬隊的同伴們，終於可以回家了。"},
+  {"cmd":"label","name":"k"},
+  {"cmd":"if","flag":"kit_trust","goto":"kit"},
+  {"cmd":"goto","label":"fin"},
+  {"cmd":"label","name":"kit"},
+  {"cmd":"say","who":"kit","text":"老大，以後也讓我跟著你吧。"},
+  {"cmd":"label","name":"fin"},
+  {"cmd":"say","who":"alan","side":"right","text":"謝謝大家。這個國家的晨星，是我們每一個人。"},
+  {"cmd":"narrate","text":"── 示範劇本《邊境的晨星》完 ── 用編輯器來寫你自己的故事吧！"}],
+ "sup_alan_mira_c":[
+  {"cmd":"say","who":"mira","text":"艾倫大人，您又一個人衝在最前面了。"},
+  {"cmd":"say","who":"alan","side":"right","text":"抱歉……但我不想讓任何人因為我而受傷。"},
+  {"cmd":"say","who":"mira","text":"那就讓我跟在您身邊吧。騎士的職責就是守護主君。"}],
+ "sup_alan_mira_b":[
+  {"cmd":"say","who":"alan","side":"right","text":"米菈，妳為什麼會成為騎士？"},
+  {"cmd":"say","who":"mira","text":"……小時候，是您的父親救了我的村子。那天我就決定了。"}],
+ "sup_alan_mira_a":[
+  {"cmd":"say","who":"mira","text":"不管前方是什麼，我都會和您一起走下去。"},
+  {"cmd":"say","who":"alan","side":"right","text":"謝謝妳，米菈。有妳在，我就不會迷失。"},
+  {"cmd":"learn","unit":"alan","skill":"sol"},
+  {"cmd":"narrate","text":"艾倫學會了技能「太陽」！"}],
+ "sup_elle_lina_c":[
+  {"cmd":"say","who":"elle","text":"莉娜，妳的治療杖好厲害！可以教我嗎？"},
+  {"cmd":"say","who":"lina","side":"right","text":"呵呵，那妳先把火焰魔法的法力省一點用吧。"}],
+ "sup_elle_lina_b":[
+  {"cmd":"say","who":"lina","side":"right","text":"艾兒，妳最近法力控制得很好呢。"},
+  {"cmd":"say","who":"elle","text":"嘿嘿，因為我想跟莉娜一樣保護大家！"}],
+ "sup_rook_kit_c":[
+  {"cmd":"say","who":"rook","text":"……你剛剛是不是偷了我的箭？"},
+  {"cmd":"say","who":"kit","side":"right","text":"借、借一下而已嘛！"}],
+ "ch1_intro":[
+  {"cmd":"narrate","text":"大陸歷 812 年。帝國的鐵蹄逼近邊境，山賊也趁亂四起……"},
+  {"cmd":"say","who":"mira","text":"艾倫大人！山賊佔據了村子東邊的砦，村民們很危險。"},
+  {"cmd":"say","who":"alan","side":"right","text":"我知道。大家，跟我來——先擊倒山賊頭目加爾！"},
+  {"cmd":"say","who":"elle","text":"我的火焰魔法對付重甲很有效喔。"},
+  {"cmd":"say","who":"rook","text":"弓箭只能射兩格外的敵人，別讓他們貼近我。"},
+  {"cmd":"say","who":"lina","text":"受傷了就到我身邊來，我用治療杖幫大家回復。"},
+  {"cmd":"narrate","text":"【提示】點選我方單位→點藍色格移動→選擇行動：攻擊／杖／精神／道具／交換／待機。村莊(V)可以拜訪；艾倫可以和盜賊基特「交談」。"},
+  {"cmd":"gold","add":1500},
+  {"cmd":"narrate","text":"【精神指令】消耗 SP 發動「必中」「熱血」「加速」等效果。【氣力】戰鬥與擊破敵人會提升，氣力越高傷害越大；艾倫的「流星斬」需要氣力 115。"}],
+ "ch1_kit":[
+  {"cmd":"say","who":"kit","text":"……你們不是帝國的人？"},
+  {"cmd":"say","who":"alan","side":"right","text":"我們是來保護村子的。你不像山賊，為什麼跟他們在一起？"},
+  {"cmd":"say","who":"kit","text":"為了錢啦。不過……加爾那傢伙連村民都搶，我也看不下去了。"},
+  {"cmd":"choice","prompt":"要怎麼回應基特？","options":[
+    {"text":"「跟我們走吧，我需要你的身手。」","set":"kit_trust","goto":"join"},
+    {"text":"「把偷來的東西還回去，就放你走。」","goto":"join_reluctant"}]},
+  {"cmd":"label","name":"join"},
+  {"cmd":"say","who":"kit","text":"嘿，有意思。好，算我一份！"},
+  {"cmd":"goto","label":"done"},
+  {"cmd":"label","name":"join_reluctant"},
+  {"cmd":"say","who":"kit","text":"……嘖，被看穿了。那我就跟著你們，順便還債吧。"},
+  {"cmd":"label","name":"done"},
+  {"cmd":"recruit","unit":"kit"},
+  {"cmd":"set","flag":"kit_joined"}],
+ "ch1_village":[
+  {"cmd":"say","name":"村長","text":"謝謝您來救我們！這把殺劍請收下，是過去騎士留下的。"},
+  {"cmd":"give","unit":"alan","weapon":"killing_edge"},
+  {"cmd":"narrate","text":"艾倫獲得了殺劍！村長還透露：森林小徑可以繞過帝國的關所。"},
+  {"cmd":"set","flag":"knows_forest"}],
+ "ch1_village2":[
+  {"cmd":"say","name":"老婆婆","text":"年輕人，小心帝國的天馬騎士。她們……其實並不想打仗。這枚戒指送你，會讓你更有力氣。"},
+  {"cmd":"give","unit":"alan","item":"power_ring"},
+  {"cmd":"set","flag":"knows_sera"}],
+ "ch1_reinf":[
+  {"cmd":"say","who":"garr","text":"哈！我的手下從山裡來啦！"},
+  {"cmd":"spawn","units":[
+    {"unit":"bandit","team":"enemy","x":15,"y":0,"ai":"aggressive"},
+    {"unit":"bandit_axe","team":"enemy","x":14,"y":10,"ai":"aggressive"}]}],
+ "ch1_garr":[
+  {"cmd":"say","who":"garr","text":"可、可惡……我加爾竟然……"},
+  {"cmd":"gold","add":2000},
+  {"cmd":"narrate","text":"獲得山賊的藏寶 2000 金。"}],
+ "ch1_end":[
+  {"cmd":"say","who":"mira","text":"村子保住了。不過帝國軍主力就在前方。"},
+  {"cmd":"if","flag":"knows_forest","goto":"forest_known"},
+  {"cmd":"say","who":"rook","text":"走大路的話會碰上關所……還有其他路嗎？"},
+  {"cmd":"label","name":"forest_known"},
+  {"cmd":"choice","prompt":"前往王都的路線","options":[
+    {"text":"穿越迷霧森林（防守戰：撐過 5 回合）","set":"route_forest"},
+    {"text":"正面突破王道關所（壓制戰）"}]},
+  {"cmd":"say","who":"alan","side":"right","text":"決定了，出發！"}],
+ "ch2a_intro":[
+  {"cmd":"narrate","text":"迷霧森林。濃霧中傳來帝國兵的腳步聲……（霧戰：只看得到我方附近的敵人，盜賊與天馬騎士視野較廣）"},
+  {"cmd":"say","who":"sera","text":"（天馬騎士瑟拉離開了帝國部隊，正獨自在森林中徘徊。）"},
+  {"cmd":"say","who":"alan","side":"right","text":"被包圍了！守住陣形，撐到霧散！"}],
+ "ch2a_reinf":[
+  {"cmd":"spawn","units":[
+    {"unit":"soldier","team":"enemy","x":15,"y":5},
+    {"unit":"imp_archer","team":"enemy","x":0,"y":5}]}],
+ "ch2b_intro":[
+  {"cmd":"say","who":"alan","side":"right","text":"突破關所，壓制右側的王座(K)！"},
+  {"cmd":"if","flag":"knows_sera","goto":"hint"},
+  {"cmd":"end"},
+  {"cmd":"label","name":"hint"},
+  {"cmd":"say","who":"elle","text":"那位天馬騎士……老婆婆說她不想打仗，也許可以跟她談談？"}],
+ "ch2_sera":[
+  {"cmd":"say","who":"sera","text":"你就是邊境的艾倫？……帝國的做法，我已經受夠了。"},
+  {"cmd":"say","who":"alan","side":"right","text":"那就和我們一起，終結這場戰爭吧。"},
+  {"cmd":"recruit","unit":"sera"},
+  {"cmd":"set","flag":"sera_joined"}],
+ "ch2_end":[
+  {"cmd":"say","who":"mira","text":"前方就是沃斯將軍的本陣了。這把在敵營找到的勇者之劍，給艾倫大人用吧。"},
+  {"cmd":"give","unit":"alan","weapon":"brave_sword"},
+  {"cmd":"if","flag":"sera_joined","goto":"sera"},
+  {"cmd":"end"},
+  {"cmd":"label","name":"sera"},
+  {"cmd":"say","who":"sera","text":"沃斯將軍很堅固，用魔法攻擊比較有效。"}],
+ "ch3_intro":[
+  {"cmd":"narrate","text":"【提示】沃斯將軍持有地圖兵器「震地槍」（直線 3 格），不要排成一直線！體力不足時「待機」可以喘口氣。"},
+  {"cmd":"say","who":"voss","text":"邊境的小鬼，就到此為止了。"},
+  {"cmd":"say","who":"alan","side":"right","text":"不，這裡才是開始！"}],
+ "ch3_voss":[
+  {"cmd":"say","who":"voss","text":"這股力量……就是所謂的「晨星」嗎……"}],
+ "ch3_end":[
+  {"cmd":"narrate","text":"沃斯將軍倒下，帝國軍撤退了。"},
+  {"cmd":"if","flag":"kit_trust","goto":"kit"},
+  {"cmd":"goto","label":"fin"},
+  {"cmd":"label","name":"kit"},
+  {"cmd":"say","who":"kit","text":"老大，下次去哪裡？我都跟定你了。"},
+  {"cmd":"label","name":"fin"},
+  {"cmd":"narrate","text":"帝國軍向斷崖峽谷撤退，艾倫一行人緊追在後。"}]
+}
+}
+# sera recruitable only once on any chapter; in ch2a she's ally team -> talk recruit fine
+out="/* 內建示範劇本（由編輯器格式產生，可直接用編輯器開啟修改）\n   以 JS 包裝是為了讓 file:// 雙擊開啟時也能載入 */\nwindow.SRPG_DEFAULT_CAMPAIGN = "+json.dumps(C,ensure_ascii=False,indent=1)+";\n"
+open(os.path.join(HERE,'..','data','demo-campaign.js'),'w').write(out)
+print(len(out))

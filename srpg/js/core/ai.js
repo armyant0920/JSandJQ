@@ -1,5 +1,6 @@
 /* 敵方/友軍 AI
-   ai 類型：aggressive(主動進攻) / guard(範圍內有目標才行動) / hold(原地不動，只攻擊射程內) */
+   ai 類型：aggressive(主動進攻) / guard(範圍內有目標才行動) / hold(原地不動，只攻擊射程內)
+            cautious(慎重：不打會被反擊打倒的仗，不站進會被圍攻致死的位置) */
 (function (root) {
   'use strict';
   const SRPG = root.SRPG = root.SRPG || {};
@@ -21,6 +22,25 @@
     const back = fc.def ? fc.def.dmg * fc.def.count * fc.def.hit / 100 : 0;
     const terr = R.terrainAt(b, pos.x, pos.y) || {};
     return exp * 2 + kill - back + (terr.def || 0) + (terr.avo || 0) / 10 + (t.lord ? 5 : 0);
+  }
+
+  // 下回合可能受到的最大傷害（所有能到達此格的敵人各打一次）
+  function dangerAt(b, u, pos) {
+    let total = 0;
+    const ox = u.x, oy = u.y;
+    u.x = pos.x; u.y = pos.y;
+    for (const o of B.living(b)) {
+      if (R.friendly(o.team, u.team)) continue;
+      const k = pos.x + ',' + pos.y;
+      if (o.ai === 'hold') { if (!R.attackTilesFrom(b, o, o).some((p) => p.x === pos.x && p.y === pos.y)) continue; }
+      else { const t = R.threatTiles(b, o); if (!t.atk.has(k) && !t.move.has(k)) continue; }
+      const w = R.attackWeapons(b, o)[0];
+      if (!w) continue;
+      const s = R.combatSide(b, o, u, o, u, { weapon: w.w, ignoreRange: true });
+      if (s) total += s.dmg * s.count;
+    }
+    u.x = ox; u.y = oy;
+    return total;
   }
 
   // 杖：找可到達、可治療的受傷同伴（缺血最多者）
@@ -106,6 +126,15 @@
         if (!B.weaponsFor(b, u, d).length) continue;
         const s = scoreAttack(b, u, t, n);
         if (s == null) continue;
+        if (u.ai === 'cautious') {
+          const ox = u.x, oy = u.y; u.x = n.x; u.y = n.y;
+          const fc = B.previewAttack(b, u, t);
+          u.x = ox; u.y = oy;
+          const kills = fc.att && fc.att.dmg * fc.att.strikes >= t.hp && fc.att.hit >= 70;
+          const back = fc.def ? fc.def.dmg * fc.def.strikes : 0;
+          if (back >= u.hp) continue;
+          if (!kills && back + dangerAt(b, u, n) >= u.hp * 0.6) continue;
+        }
         const sc = s - n.cost * 0.01; // 同分時少走一點
         if (!best || sc > best.score) best = { x: n.x, y: n.y, target: t.uid, score: sc };
       }
@@ -114,6 +143,18 @@
     if (mp && (!best || mp.score > best.score * 0.8)) return mp;
     if (best) return best;
     if (hv) return hv;
+    if (u.ai === 'cautious' && foes.length) {
+      // 沒有安全的攻擊：往安全且靠近敵人的地方移動
+      let safe = null;
+      const nearest = (n) => Math.min(...foes.map((f) => dist(n, f)));
+      for (const n of reach.values()) {
+        if (!n.stop) continue;
+        const d = dangerAt(b, u, n);
+        const sc = (d >= u.hp * 0.6 ? -100 : 0) - nearest(n) * 0.5 - d * 0.2;
+        if (!safe || sc > safe.score) safe = { x: n.x, y: n.y, target: null, score: sc };
+      }
+      if (safe) return safe;
+    }
     if (u.ai !== 'aggressive' || !foes.length) return { x: u.x, y: u.y, target: null };
 
     // 沒有可攻擊目標：朝最近敵人前進（用無限移動力的路徑距離）
@@ -134,6 +175,6 @@
     return { x: dest.x, y: dest.y, target: null };
   }
 
-  SRPG.ai = { plan, scoreAttack, planMap, pickSpirits };
+  SRPG.ai = { plan, scoreAttack, planMap, pickSpirits, dangerAt };
   if (typeof module !== 'undefined' && module.exports) module.exports = SRPG;
 })(typeof window !== 'undefined' ? window : globalThis);

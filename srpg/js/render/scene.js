@@ -196,7 +196,7 @@
 
     function frame(now) {
       if (!alive) return;
-      const dt = (now - last) * speed * fast; last = now;
+      const dt = Math.max(0, now - last) * speed * fast; last = Math.max(last, now);
       clock += dt;
       // 補間
       for (const tw of tweens) {

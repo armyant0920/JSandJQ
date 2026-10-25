@@ -76,7 +76,8 @@
   function pickFrame(sp, pose, t, period, offset) {
     const list = poseFrames(sp, pose) || poseFrames(sp, 'idle');
     if (!list || !list.length) return 0;
-    return list[Math.floor((t || 0) / (period || 400) + (offset || 0)) % list.length];
+    const k = Math.floor(Math.max(0, t || 0) / (period || 400) + (offset || 0));
+    return list[((k % list.length) + list.length) % list.length];
   }
 
   // 取得某影格的 canvas/image 與來源矩形

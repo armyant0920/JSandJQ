@@ -11,9 +11,10 @@ window.SRPG_DEFAULT_CAMPAIGN = {
   "rules": {
    "morale": true,
    "spirits": true,
-   "resources": true
+   "resources": true,
+   "upgrades": true
   },
-  "desc": "內建示範：3 章、劇情分歧、說服、拜訪、增援；杖、道具、交換、救出、再移動、被動技能、體力/法力、地圖兵器、支援對話、出擊準備與商店、霧戰、精神指令、氣力。"
+  "desc": "內建示範：5 章、轉職與改造、劇情分歧、說服、拜訪、增援；杖、道具、交換、救出、再移動、被動技能、體力/法力、地圖兵器、支援對話、出擊準備與商店、霧戰、精神指令、氣力。"
  },
  "weapons": {
   "iron_sword": {
@@ -93,6 +94,7 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "cost": 6
   },
   "iron_lance": {
+   "anim": "charge",
    "name": "鐵槍",
    "type": "lance",
    "dmg": "phys",
@@ -235,8 +237,9 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "name": "震地槍",
    "type": "lance",
    "dmg": "phys",
-   "mt": 9,
-   "hit": 85,
+   "mt": 5,
+   "hit": 75,
+   "morale": 115,
    "crit": 0,
    "range": [
     1,
@@ -249,6 +252,77 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "cost": 8,
    "icon": 274,
    "desc": "地圖兵器：直線 3 格"
+  },
+  "long_bow": {
+   "name": "長弓",
+   "type": "bow",
+   "dmg": "phys",
+   "mt": 7,
+   "hit": 75,
+   "crit": 0,
+   "range": [
+    2,
+    3
+   ],
+   "effective": [
+    "fly"
+   ],
+   "icon": 59,
+   "anim": "volley",
+   "cost": 2,
+   "price": 1600
+  },
+  "silver_lance": {
+   "name": "銀槍",
+   "type": "lance",
+   "dmg": "phys",
+   "mt": 11,
+   "hit": 80,
+   "crit": 0,
+   "range": [
+    1,
+    1
+   ],
+   "icon": 271,
+   "anim": "charge",
+   "cost": 2,
+   "price": 2000
+  },
+  "dark_flux": {
+   "name": "闇之波動",
+   "type": "dark",
+   "dmg": "mag",
+   "mt": 9,
+   "hit": 75,
+   "crit": 0,
+   "range": [
+    1,
+    2
+   ],
+   "icon": 259,
+   "anim": "magic_dark",
+   "cost": 3,
+   "price": 1400
+  },
+  "shadow_wave": {
+   "name": "暗影潮",
+   "type": "dark",
+   "dmg": "mag",
+   "mt": 5,
+   "hit": 75,
+   "morale": 115,
+   "crit": 0,
+   "range": [
+    1,
+    3
+   ],
+   "map": {
+    "shape": "burst",
+    "size": 1
+   },
+   "cost": 8,
+   "icon": 264,
+   "desc": "地圖兵器"
   },
   "physic": {
    "name": "遠距治療杖",
@@ -265,6 +339,14 @@ window.SRPG_DEFAULT_CAMPAIGN = {
   }
  },
  "items": {
+  "master_seal": {
+   "name": "騎士勳章",
+   "kind": "promote",
+   "uses": 1,
+   "icon": 175,
+   "price": 2500,
+   "desc": "Lv5 以上可轉職為上級職業"
+  },
   "ether": {
    "name": "魔力水",
    "kind": "mp",
@@ -326,7 +408,95 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "name": "領主",
    "move": 5,
    "moveType": "foot",
-   "sprite": "swordsman"
+   "sprite": "swordsman",
+   "promote": [
+    {
+     "to": "high_lord",
+     "level": 5,
+     "item": "master_seal",
+     "bonus": {
+      "hp": 4,
+      "str": 2,
+      "skl": 2,
+      "spd": 1,
+      "def": 2,
+      "res": 2,
+      "st": 5
+     }
+    }
+   ]
+  },
+  "high_lord": {
+   "name": "晨星領主",
+   "move": 6,
+   "moveType": "foot",
+   "sprite": "swordsman",
+   "skills": [
+    "pursuit"
+   ]
+  },
+  "paladin": {
+   "name": "聖騎士",
+   "move": 8,
+   "moveType": "horse",
+   "sprite": "cavalier",
+   "tags": [
+    "horse"
+   ],
+   "skills": [
+    "canto",
+    "guard"
+   ]
+  },
+  "sniper": {
+   "name": "狙擊手",
+   "move": 5,
+   "moveType": "foot",
+   "sprite": "archer",
+   "skills": [
+    "keen"
+   ]
+  },
+  "sage": {
+   "name": "賢者",
+   "move": 5,
+   "moveType": "foot",
+   "sprite": "mage",
+   "skills": [
+    "adept"
+   ]
+  },
+  "bishop": {
+   "name": "主教",
+   "move": 5,
+   "moveType": "foot",
+   "sprite": "mage",
+   "skills": [
+    "guard"
+   ]
+  },
+  "assassin": {
+   "name": "刺客",
+   "move": 6,
+   "moveType": "foot",
+   "sprite": "swordsman",
+   "vision": 6,
+   "skills": [
+    "luna"
+   ]
+  },
+  "falcon": {
+   "name": "獵鷹騎士",
+   "move": 8,
+   "moveType": "fly",
+   "sprite": "pegasus",
+   "tags": [
+    "fly"
+   ],
+   "skills": [
+    "canto"
+   ],
+   "vision": 5
   },
   "cavalier": {
    "name": "騎士",
@@ -338,19 +508,69 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    ],
    "skills": [
     "canto"
+   ],
+   "promote": [
+    {
+     "to": "paladin",
+     "level": 5,
+     "item": "master_seal",
+     "bonus": {
+      "hp": 4,
+      "str": 2,
+      "def": 3,
+      "res": 2,
+      "st": 5
+     }
+    }
    ]
   },
   "archer": {
    "name": "弓兵",
    "move": 5,
    "moveType": "foot",
-   "sprite": "archer"
+   "sprite": "archer",
+   "promote": [
+    {
+     "to": "sniper",
+     "level": 5,
+     "item": "master_seal",
+     "bonus": {
+      "hp": 3,
+      "str": 2,
+      "skl": 3,
+      "spd": 1,
+      "def": 1,
+      "st": 5
+     },
+     "weapons": [
+      "long_bow"
+     ]
+    }
+   ]
   },
   "mage": {
    "name": "魔道士",
    "move": 5,
    "moveType": "foot",
-   "sprite": "mage"
+   "sprite": "mage",
+   "promote": [
+    {
+     "to": "sage",
+     "level": 5,
+     "item": "master_seal",
+     "bonus": {
+      "hp": 3,
+      "mag": 3,
+      "skl": 1,
+      "spd": 1,
+      "res": 3,
+      "mp": 8
+     },
+     "weapons": [
+      "heal_staff"
+     ]
+    }
+   ]
   },
   "fighter": {
    "name": "戰士",
@@ -378,7 +598,22 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "move": 6,
    "moveType": "foot",
    "sprite": "swordsman",
-   "vision": 5
+   "vision": 5,
+   "promote": [
+    {
+     "to": "assassin",
+     "level": 5,
+     "item": "master_seal",
+     "bonus": {
+      "hp": 3,
+      "str": 2,
+      "skl": 2,
+      "spd": 2,
+      "def": 1,
+      "st": 5
+     }
+    }
+   ]
   },
   "pegasus": {
    "name": "天馬騎士",
@@ -391,7 +626,22 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "skills": [
     "canto"
    ],
-   "vision": 4
+   "vision": 4,
+   "promote": [
+    {
+     "to": "falcon",
+     "level": 5,
+     "item": "master_seal",
+     "bonus": {
+      "hp": 4,
+      "str": 2,
+      "spd": 2,
+      "def": 2,
+      "res": 2,
+      "st": 5
+     }
+    }
+   ]
   },
   "soldier": {
    "name": "士兵",
@@ -403,7 +653,24 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "name": "僧侶",
    "move": 5,
    "moveType": "foot",
-   "sprite": "mage"
+   "sprite": "mage",
+   "promote": [
+    {
+     "to": "bishop",
+     "level": 5,
+     "item": "master_seal",
+     "bonus": {
+      "hp": 3,
+      "mag": 2,
+      "def": 1,
+      "res": 3,
+      "mp": 10
+     },
+     "weapons": [
+      "physic"
+     ]
+    }
+   ]
   }
  },
  "units": {
@@ -728,15 +995,15 @@ window.SRPG_DEFAULT_CAMPAIGN = {
   "garr": {
    "name": "加爾",
    "class": "brigand",
-   "level": 6,
+   "level": 5,
    "stats": {
-    "hp": 32,
-    "str": 10,
+    "hp": 28,
+    "str": 9,
     "mag": 0,
-    "skl": 6,
-    "spd": 6,
+    "skl": 5,
+    "spd": 5,
     "lck": 2,
-    "def": 6,
+    "def": 5,
     "res": 1
    },
    "weapons": [
@@ -760,13 +1027,13 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "class": "soldier",
    "level": 4,
    "stats": {
-    "hp": 21,
-    "str": 6,
+    "hp": 20,
+    "str": 5,
     "mag": 0,
     "skl": 5,
     "spd": 5,
     "lck": 2,
-    "def": 6,
+    "def": 5,
     "res": 1
    },
    "weapons": [
@@ -829,6 +1096,127 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    ],
    "mp": 12
   },
+  "imp_pegasus": {
+   "name": "帝國天馬",
+   "class": "pegasus",
+   "level": 6,
+   "stats": {
+    "hp": 19,
+    "str": 6,
+    "mag": 1,
+    "skl": 7,
+    "spd": 9,
+    "lck": 3,
+    "def": 5,
+    "res": 6
+   },
+   "weapons": [
+    "iron_lance",
+    "javelin"
+   ],
+   "st": 10
+  },
+  "imp_sniper": {
+   "name": "帝國狙擊手",
+   "class": "sniper",
+   "level": 3,
+   "stats": {
+    "hp": 23,
+    "str": 7,
+    "mag": 0,
+    "skl": 9,
+    "spd": 7,
+    "lck": 3,
+    "def": 5,
+    "res": 3
+   },
+   "weapons": [
+    "long_bow"
+   ],
+   "st": 12
+  },
+  "imp_paladin": {
+   "name": "帝國聖騎士",
+   "class": "paladin",
+   "level": 3,
+   "stats": {
+    "hp": 28,
+    "str": 9,
+    "mag": 0,
+    "skl": 7,
+    "spd": 7,
+    "lck": 3,
+    "def": 9,
+    "res": 4
+   },
+   "weapons": [
+    "silver_lance",
+    "javelin"
+   ],
+   "st": 14
+  },
+  "helga": {
+   "name": "闇術師赫爾加",
+   "class": "sage",
+   "level": 5,
+   "stats": {
+    "hp": 28,
+    "str": 0,
+    "mag": 11,
+    "skl": 9,
+    "spd": 8,
+    "lck": 4,
+    "def": 6,
+    "res": 9
+   },
+   "weapons": [
+    "dark_flux",
+    "shadow_wave"
+   ],
+   "mp": 40,
+   "skills": [
+    "vantage"
+   ],
+   "spirits": [
+    "focus",
+    "iron_wall"
+   ],
+   "sp": 40,
+   "morale": 110,
+   "sprite": "mage"
+  },
+  "emperor": {
+   "name": "皇帝傑羅斯",
+   "class": "high_lord",
+   "level": 8,
+   "stats": {
+    "hp": 36,
+    "str": 12,
+    "mag": 3,
+    "skl": 10,
+    "spd": 9,
+    "lck": 6,
+    "def": 10,
+    "res": 6
+   },
+   "weapons": [
+    "killing_edge",
+    "silver_lance"
+   ],
+   "st": 40,
+   "skills": [
+    "sol"
+   ],
+   "spirits": [
+    "valor",
+    "strike"
+   ],
+   "sp": 60,
+   "morale": 110,
+   "items": [
+    "elixir"
+   ]
+  },
   "imp_cleric": {
    "name": "帝國僧侶",
    "class": "cleric",
@@ -851,16 +1239,16 @@ window.SRPG_DEFAULT_CAMPAIGN = {
   "voss": {
    "name": "沃斯將軍",
    "class": "knight",
-   "level": 9,
+   "level": 7,
    "stats": {
-    "hp": 34,
-    "str": 12,
+    "hp": 28,
+    "str": 10,
     "mag": 0,
-    "skl": 8,
+    "skl": 7,
     "spd": 4,
-    "lck": 4,
-    "def": 14,
-    "res": 3
+    "lck": 3,
+    "def": 7,
+    "res": 2
    },
    "weapons": [
     "iron_lance",
@@ -873,15 +1261,13 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "sprite": "chara_2",
    "st": 30,
    "skills": [
-    "luna",
-    "guard"
+    "luna"
    ],
    "spirits": [
-    "iron_wall",
     "valor",
     "strike"
    ],
-   "sp": 60,
+   "sp": 40,
    "morale": 105
   }
  },
@@ -920,8 +1306,71 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "....oto..oto....",
      "....oo....oo....",
      "................"
+    ],
+    [
+     "................",
+     "................",
+     ".....oooooo.....",
+     "....ohhhhhho....",
+     "...ohhhhhhhho...",
+     "...ohhsssshho...",
+     "...ohseesseho...",
+     "....ossssso.....",
+     "...oTTTTTTTo.w..",
+     "..osTtTTTtTsow..",
+     "..os.TTTTT.sow..",
+     "...o.TTTTT.oo...",
+     "....obbbbbo.....",
+     "....otttttto....",
+     "....oto..oto....",
+     "....oo....oo...."
+    ],
+    [
+     "................",
+     ".......oooooo...",
+     "......ohhhhhho..",
+     ".....ohhhhhhhho.",
+     ".....ohhsssshho.",
+     ".....ohseesseho.",
+     "......ossssso...",
+     ".....oTTTTTTTo.w",
+     "....osTtTTTtTsow",
+     "....os.TTTTT.sow",
+     ".....o.TTTTT.oo.",
+     "......obbbbbo...",
+     "......otttttto..",
+     "......oto..oto..",
+     "......oo....oo..",
+     "................"
+    ],
+    [
+     "................",
+     "....oooooo......",
+     "...ohhhhhho.....",
+     "..ohhhhhhhho....",
+     "..ohhsssshho....",
+     "..ohseesseho....",
+     "...ossssso......",
+     "..oTTTTTTTo.w...",
+     ".osTtTTTtTsow...",
+     ".os.TTTTT.sow...",
+     "..o.TTTTT.oo....",
+     "...obbbbbo......",
+     "...otttttto.....",
+     "...oto..oto.....",
+     "...oo....oo.....",
+     "................"
     ]
-   ]
+   ],
+   "poses": {
+    "attack": [
+     2
+    ],
+    "hurt": [
+     3
+    ]
+   },
+   "fps": 2
   },
   "lancer": {
    "name": "lancer",
@@ -957,8 +1406,71 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "....owo.owo.....",
      "....oo...oo.....",
      "................"
+    ],
+    [
+     "................",
+     "................",
+     ".....oooooo.....",
+     "....ohhhhhho....",
+     "...ohhhhhhhho...",
+     "...ohhsssshho...",
+     "...ohseesseho...",
+     "....ossssso..w..",
+     "..wwTTTTTTTwwww.",
+     "..owTwwwwwTwow..",
+     "..owTTTTTTTwo...",
+     "...owTTTTTwo....",
+     "....obbbbbo.....",
+     "....owwwwwo.....",
+     "....owo.owo.....",
+     "....oo...oo....."
+    ],
+    [
+     "................",
+     ".......oooooo...",
+     "......ohhhhhho..",
+     ".....ohhhhhhhho.",
+     ".....ohhsssshho.",
+     ".....ohseesseho.",
+     "......ossssso..w",
+     "....wwTTTTTTTwww",
+     "....owTwwwwwTwow",
+     "....owTTTTTTTwo.",
+     ".....owTTTTTwo..",
+     "......obbbbbo...",
+     "......owwwwwo...",
+     "......owo.owo...",
+     "......oo...oo...",
+     "................"
+    ],
+    [
+     "................",
+     "....oooooo......",
+     "...ohhhhhho.....",
+     "..ohhhhhhhho....",
+     "..ohhsssshho....",
+     "..ohseesseho....",
+     "...ossssso..w...",
+     ".wwTTTTTTTwwww..",
+     ".owTwwwwwTwow...",
+     ".owTTTTTTTwo....",
+     "..owTTTTTwo.....",
+     "...obbbbbo......",
+     "...owwwwwo......",
+     "...owo.owo......",
+     "...oo...oo......",
+     "................"
     ]
-   ]
+   ],
+   "poses": {
+    "attack": [
+     2
+    ],
+    "hurt": [
+     3
+    ]
+   },
+   "fps": 2
   },
   "archer": {
    "name": "archer",
@@ -994,8 +1506,71 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "....oto..oto....",
      "....oo....oo....",
      "................"
+    ],
+    [
+     "................",
+     "................",
+     ".....oooooo.....",
+     "....ohhhhhho....",
+     "...ohhhhhhhho...",
+     "...ohhsssshho...",
+     "...ohseesseho...",
+     "....ossssso.b...",
+     "...oTTTTTTTob...",
+     "..osTtTTTtTsob..",
+     "..os.TTTTTsoob..",
+     "...o.TTTTT.ob...",
+     "....obbbbbob....",
+     "....otttttto....",
+     "....oto..oto....",
+     "....oo....oo...."
+    ],
+    [
+     "................",
+     ".......oooooo...",
+     "......ohhhhhho..",
+     ".....ohhhhhhhho.",
+     ".....ohhsssshho.",
+     ".....ohseesseho.",
+     "......ossssso.b.",
+     ".....oTTTTTTTob.",
+     "....osTtTTTtTsob",
+     "....os.TTTTTsoob",
+     ".....o.TTTTT.ob.",
+     "......obbbbbob..",
+     "......otttttto..",
+     "......oto..oto..",
+     "......oo....oo..",
+     "................"
+    ],
+    [
+     "................",
+     "....oooooo......",
+     "...ohhhhhho.....",
+     "..ohhhhhhhho....",
+     "..ohhsssshho....",
+     "..ohseesseho....",
+     "...ossssso.b....",
+     "..oTTTTTTTob....",
+     ".osTtTTTtTsob...",
+     ".os.TTTTTsoob...",
+     "..o.TTTTT.ob....",
+     "...obbbbbob.....",
+     "...otttttto.....",
+     "...oto..oto.....",
+     "...oo....oo.....",
+     "................"
     ]
-   ]
+   ],
+   "poses": {
+    "attack": [
+     2
+    ],
+    "hurt": [
+     3
+    ]
+   },
+   "fps": 2
   },
   "mage": {
    "name": "mage",
@@ -1031,8 +1606,71 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "...ottttttto.b..",
      "....oo...oo.....",
      "................"
+    ],
+    [
+     "................",
+     "......oo........",
+     ".....oTTo.......",
+     "....oTTTTo......",
+     "...oTTTTTTo.....",
+     "..ooooooooooo...",
+     "...ohseesseho...",
+     "....ossssso..y..",
+     "...oTTTTTTTo.b..",
+     "..oTtTTTTTtTob..",
+     "..osTTTTTTTsob..",
+     "..oTTTTTTTTTob..",
+     "..oTTTTTTTTTTb..",
+     "..otTTTTTTTTtb..",
+     "...ottttttto.b..",
+     "....oo...oo....."
+    ],
+    [
+     "........oo......",
+     ".......oTTo.....",
+     "......oTTTTo....",
+     ".....oTTTTTTo...",
+     "....ooooooooooo.",
+     ".....ohseesseho.",
+     "......ossssso..y",
+     ".....oTTTTTTTo.b",
+     "....oTtTTTTTtTob",
+     "....osTTTTTTTsob",
+     "....oTTTTTTTTTob",
+     "....oTTTTTTTTTTb",
+     "....otTTTTTTTTtb",
+     ".....ottttttto.b",
+     "......oo...oo...",
+     "................"
+    ],
+    [
+     ".....oo.........",
+     "....oTTo........",
+     "...oTTTTo.......",
+     "..oTTTTTTo......",
+     ".ooooooooooo....",
+     "..ohseesseho....",
+     "...ossssso..y...",
+     "..oTTTTTTTo.b...",
+     ".oTtTTTTTtTob...",
+     ".osTTTTTTTsob...",
+     ".oTTTTTTTTTob...",
+     ".oTTTTTTTTTTb...",
+     ".otTTTTTTTTtb...",
+     "..ottttttto.b...",
+     "...oo...oo......",
+     "................"
     ]
-   ]
+   ],
+   "poses": {
+    "attack": [
+     2
+    ],
+    "hurt": [
+     3
+    ]
+   },
+   "fps": 2
   },
   "fighter": {
    "name": "fighter",
@@ -1068,8 +1706,71 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "....oto..oto....",
      "....oo....oo....",
      "................"
+    ],
+    [
+     "................",
+     "................",
+     ".....oooooo.....",
+     "....ohhhhhho....",
+     "...ohhhhhhhho...",
+     "...ohhsssshho...",
+     "...ohseesseho...",
+     "....ossssso.ww..",
+     "..ooTTTTTTToww..",
+     ".ossTtTTTtssobw.",
+     ".oss.TTTTTsso.b.",
+     "..oo.TTTTT.oo.b.",
+     "....obbbbbo...b.",
+     "....otttttto....",
+     "....oto..oto....",
+     "....oo....oo...."
+    ],
+    [
+     "................",
+     ".......oooooo...",
+     "......ohhhhhho..",
+     ".....ohhhhhhhho.",
+     ".....ohhsssshho.",
+     ".....ohseesseho.",
+     "......ossssso.ww",
+     "....ooTTTTTTToww",
+     "...ossTtTTTtssob",
+     "...oss.TTTTTsso.",
+     "....oo.TTTTT.oo.",
+     "......obbbbbo...",
+     "......otttttto..",
+     "......oto..oto..",
+     "......oo....oo..",
+     "................"
+    ],
+    [
+     "................",
+     "....oooooo......",
+     "...ohhhhhho.....",
+     "..ohhhhhhhho....",
+     "..ohhsssshho....",
+     "..ohseesseho....",
+     "...ossssso.ww...",
+     ".ooTTTTTTToww...",
+     "ossTtTTTtssobw..",
+     "oss.TTTTTsso.b..",
+     ".oo.TTTTT.oo.b..",
+     "...obbbbbo...b..",
+     "...otttttto.....",
+     "...oto..oto.....",
+     "...oo....oo.....",
+     "................"
     ]
-   ]
+   ],
+   "poses": {
+    "attack": [
+     2
+    ],
+    "hurt": [
+     3
+    ]
+   },
+   "fps": 2
   },
   "knight": {
    "name": "knight",
@@ -1105,8 +1806,71 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "...owwo..owwo...",
      "...ooo....ooo...",
      "................"
+    ],
+    [
+     "................",
+     "................",
+     ".....wwwwww.....",
+     "....wwwwwwww....",
+     "...owwTTTTwwo...",
+     "...owwoeeowwo...",
+     "...owwwwwwwwo...",
+     "....owwwwwo.w...",
+     "..wwTTTTTTTwww..",
+     ".owwTwwwwwTwwow.",
+     ".owwTTTTTTTwwo..",
+     "..owwTTTTTwwo...",
+     "...owwwwwwwo....",
+     "...owwwwwwwwo...",
+     "...owwo..owwo...",
+     "...ooo....ooo..."
+    ],
+    [
+     "................",
+     ".......wwwwww...",
+     "......wwwwwwww..",
+     ".....owwTTTTwwo.",
+     ".....owwoeeowwo.",
+     ".....owwwwwwwwo.",
+     "......owwwwwo.w.",
+     "....wwTTTTTTTwww",
+     "...owwTwwwwwTwwo",
+     "...owwTTTTTTTwwo",
+     "....owwTTTTTwwo.",
+     ".....owwwwwwwo..",
+     ".....owwwwwwwwo.",
+     ".....owwo..owwo.",
+     ".....ooo....ooo.",
+     "................"
+    ],
+    [
+     "................",
+     "....wwwwww......",
+     "...wwwwwwww.....",
+     "..owwTTTTwwo....",
+     "..owwoeeowwo....",
+     "..owwwwwwwwo....",
+     "...owwwwwo.w....",
+     ".wwTTTTTTTwww...",
+     "owwTwwwwwTwwow..",
+     "owwTTTTTTTwwo...",
+     ".owwTTTTTwwo....",
+     "..owwwwwwwo.....",
+     "..owwwwwwwwo....",
+     "..owwo..owwo....",
+     "..ooo....ooo....",
+     "................"
     ]
-   ]
+   ],
+   "poses": {
+    "attack": [
+     2
+    ],
+    "hurt": [
+     3
+    ]
+   },
+   "fps": 2
   },
   "cavalier": {
    "name": "cavalier",
@@ -1142,8 +1906,71 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "..bb.bb..bb.bb..",
      "................",
      "................"
+    ],
+    [
+     "................",
+     "......oooo......",
+     ".....ohhhho.w...",
+     ".....ohseso.w...",
+     "......osso..w...",
+     ".....oTTTTo.w...",
+     "....oTtTTtTow...",
+     ".bbbbbTTTTbbbb..",
+     "bnnnnnnnnnnnnnb.",
+     "bnnnnnnnnnnnnnnb",
+     ".bnnnnnnnnnnnnb.",
+     "..bnnnnnnnnnnb..",
+     "..bn.bn..bn.nb..",
+     "..bn.bn..bn.nb..",
+     "..bb.bb..bb.bb..",
+     "................"
+    ],
+    [
+     "........oooo....",
+     ".......ohhhho.w.",
+     ".......ohseso.w.",
+     "........osso..w.",
+     ".......oTTTTo.w.",
+     "......oTtTTtTow.",
+     "...bbbbbTTTTbbbb",
+     "..bnnnnnnnnnnnnn",
+     "..bnnnnnnnnnnnnn",
+     "...bnnnnnnnnnnnn",
+     "....bnnnnnnnnnnb",
+     "....bn.bn..bn.nb",
+     "....bn.bn..bn.nb",
+     "....bb.bb..bb.bb",
+     "................",
+     "................"
+    ],
+    [
+     ".....oooo.......",
+     "....ohhhho.w....",
+     "....ohseso.w....",
+     ".....osso..w....",
+     "....oTTTTo.w....",
+     "...oTtTTtTow....",
+     "bbbbbTTTTbbbb...",
+     "nnnnnnnnnnnnnb..",
+     "nnnnnnnnnnnnnnb.",
+     "bnnnnnnnnnnnnb..",
+     ".bnnnnnnnnnnb...",
+     ".bn.bn..bn.nb...",
+     ".bn.bn..bn.nb...",
+     ".bb.bb..bb.bb...",
+     "................",
+     "................"
     ]
-   ]
+   ],
+   "poses": {
+    "attack": [
+     2
+    ],
+    "hurt": [
+     3
+    ]
+   },
+   "fps": 2
   },
   "pegasus": {
    "name": "pegasus",
@@ -1179,8 +2006,71 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "................",
      "................",
      "................"
+    ],
+    [
+     "................",
+     "..www...........",
+     ".wwwww...oooo...",
+     ".wwwwww.ohhhho..",
+     "..wwwwwwohseso..",
+     "...wwwwwwossow..",
+     "....wwwwoTTTow..",
+     ".....wwoTtTTtow.",
+     "..wwwwwwwwwwww..",
+     ".wwwwwwwwwwwwwww",
+     "..wwwwwwwwwwww..",
+     "...ww.ww..ww.w..",
+     "...ww.ww..ww.w..",
+     "................",
+     "................",
+     "................"
+    ],
+    [
+     "....www.........",
+     "...wwwww...oooo.",
+     "...wwwwww.ohhhho",
+     "....wwwwwwohseso",
+     ".....wwwwwwossow",
+     "......wwwwoTTTow",
+     ".......wwoTtTTto",
+     "....wwwwwwwwwwww",
+     "...wwwwwwwwwwwww",
+     "....wwwwwwwwwwww",
+     ".....ww.ww..ww.w",
+     ".....ww.ww..ww.w",
+     "................",
+     "................",
+     "................",
+     "................"
+    ],
+    [
+     ".www............",
+     "wwwww...oooo....",
+     "wwwwww.ohhhho...",
+     ".wwwwwwohseso...",
+     "..wwwwwwossow...",
+     "...wwwwoTTTow...",
+     "....wwoTtTTtow..",
+     ".wwwwwwwwwwww...",
+     "wwwwwwwwwwwwwww.",
+     ".wwwwwwwwwwww...",
+     "..ww.ww..ww.w...",
+     "..ww.ww..ww.w...",
+     "................",
+     "................",
+     "................",
+     "................"
     ]
-   ]
+   ],
+   "poses": {
+    "attack": [
+     2
+    ],
+    "hurt": [
+     3
+    ]
+   },
+   "fps": 2
   },
   "chara_0": {
    "name": "藍衣少女",
@@ -1328,7 +2218,7 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     {
      "unit": "garr",
      "team": "enemy",
-     "x": 14,
+     "x": 13,
      "y": 6,
      "ai": "hold",
      "boss": true
@@ -1566,18 +2456,19 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "unit": "alan",
      "team": "player",
      "x": 0,
-     "y": 4
+     "y": 5,
+     "forced": true
     },
     {
      "unit": "mira",
      "team": "player",
-     "x": 0,
-     "y": 5
+     "x": 1,
+     "y": 4
     },
     {
      "unit": "rook",
      "team": "player",
-     "x": 1,
+     "x": 0,
      "y": 3
     },
     {
@@ -1604,7 +2495,7 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "team": "enemy",
      "x": 9,
      "y": 1,
-     "ai": "guard"
+     "ai": "hold"
     },
     {
      "unit": "soldier",
@@ -1674,7 +2565,7 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    ]
   },
   "ch3": {
-   "name": "終章 晨星之誓",
+   "name": "第三章 晨星之誓",
    "prep": true,
    "shop": [
     "vulnerary",
@@ -1828,6 +2719,362 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "script": "ch3_end"
     }
    ],
+   "next": [
+    "ch4"
+   ]
+  },
+  "ch4": {
+   "name": "第四章 斷崖峽谷",
+   "prep": true,
+   "shop": [
+    "vulnerary",
+    "elixir",
+    "ether",
+    "tonic",
+    "master_seal",
+    "iron_sword",
+    "killing_edge",
+    "brave_sword",
+    "silver_lance",
+    "long_bow",
+    "fire",
+    "thunder",
+    "dark_flux",
+    "heal_staff",
+    "physic"
+   ],
+   "deploySlots": [
+    {
+     "x": 1,
+     "y": 2
+    },
+    {
+     "x": 2,
+     "y": 7
+    }
+   ],
+   "map": {
+    "rows": [
+     "MMMMM...MMMMMMMM",
+     "MM....F....F..MM",
+     "M..F.....==...MM",
+     "...==========...",
+     "..=..FF..M..=.T.",
+     "..=..FF.MM..=...",
+     "...==========...",
+     "M...F....F....MM",
+     "MM......~~~..MMM",
+     "MMMMM..~~~~MMMMM"
+    ]
+   },
+   "units": [
+    {
+     "unit": "alan",
+     "team": "player",
+     "x": 0,
+     "y": 4,
+     "forced": true
+    },
+    {
+     "unit": "mira",
+     "team": "player",
+     "x": 0,
+     "y": 5
+    },
+    {
+     "unit": "rook",
+     "team": "player",
+     "x": 1,
+     "y": 3
+    },
+    {
+     "unit": "elle",
+     "team": "player",
+     "x": 1,
+     "y": 6
+    },
+    {
+     "unit": "lina",
+     "team": "player",
+     "x": 0,
+     "y": 3
+    },
+    {
+     "unit": "kit",
+     "team": "player",
+     "x": 1,
+     "y": 5,
+     "if": "kit_joined"
+    },
+    {
+     "unit": "sera",
+     "team": "player",
+     "x": 0,
+     "y": 6,
+     "if": "sera_joined"
+    },
+    {
+     "unit": "soldier",
+     "team": "enemy",
+     "x": 7,
+     "y": 3,
+     "level": 7
+    },
+    {
+     "unit": "soldier",
+     "team": "enemy",
+     "x": 8,
+     "y": 6,
+     "level": 7
+    },
+    {
+     "unit": "imp_archer",
+     "team": "enemy",
+     "x": 9,
+     "y": 2,
+     "level": 7
+    },
+    {
+     "unit": "imp_mage",
+     "team": "enemy",
+     "x": 10,
+     "y": 5,
+     "level": 7
+    },
+    {
+     "unit": "imp_knight",
+     "team": "enemy",
+     "x": 12,
+     "y": 4,
+     "ai": "hold",
+     "level": 7
+    },
+    {
+     "unit": "imp_cleric",
+     "team": "enemy",
+     "x": 13,
+     "y": 5,
+     "ai": "guard"
+    },
+    {
+     "unit": "imp_sniper",
+     "team": "enemy",
+     "x": 11,
+     "y": 1,
+     "ai": "hold"
+    },
+    {
+     "unit": "helga",
+     "team": "enemy",
+     "x": 14,
+     "y": 4,
+     "ai": "hold",
+     "boss": true
+    }
+   ],
+   "victory": {
+    "type": "boss"
+   },
+   "defeat": {
+    "type": "lordDies"
+   },
+   "events": [
+    {
+     "on": "start",
+     "script": "ch4_intro"
+    },
+    {
+     "on": "turn",
+     "turn": 3,
+     "phase": "enemy",
+     "script": "ch4_reinf"
+    },
+    {
+     "on": "death",
+     "unit": "helga",
+     "script": "ch4_helga"
+    },
+    {
+     "on": "victory",
+     "script": "ch4_end"
+    }
+   ],
+   "next": [
+    "ch5"
+   ]
+  },
+  "ch5": {
+   "name": "終章 帝都決戰",
+   "prep": true,
+   "shop": [
+    "vulnerary",
+    "elixir",
+    "ether",
+    "tonic",
+    "master_seal",
+    "iron_sword",
+    "killing_edge",
+    "brave_sword",
+    "silver_lance",
+    "long_bow",
+    "fire",
+    "thunder",
+    "dark_flux",
+    "heal_staff",
+    "physic"
+   ],
+   "deploySlots": [
+    {
+     "x": 1,
+     "y": 4
+    },
+    {
+     "x": 1,
+     "y": 6
+    }
+   ],
+   "map": {
+    "rows": [
+     "##################",
+     "#....#......#....#",
+     "#.T..#..==..#..K.#",
+     "#....=..==..=....#",
+     "#..====....====..#",
+     "....=..........=..",
+     "#..====....====..#",
+     "#....=..==..=....#",
+     "#.T..#..==..#....#",
+     "#....#......#....#",
+     "##################"
+    ]
+   },
+   "units": [
+    {
+     "unit": "alan",
+     "team": "player",
+     "x": 0,
+     "y": 5,
+     "forced": true
+    },
+    {
+     "unit": "mira",
+     "team": "player",
+     "x": 1,
+     "y": 5
+    },
+    {
+     "unit": "rook",
+     "team": "player",
+     "x": 2,
+     "y": 3
+    },
+    {
+     "unit": "elle",
+     "team": "player",
+     "x": 2,
+     "y": 7
+    },
+    {
+     "unit": "lina",
+     "team": "player",
+     "x": 2,
+     "y": 5
+    },
+    {
+     "unit": "kit",
+     "team": "player",
+     "x": 3,
+     "y": 5,
+     "if": "kit_joined"
+    },
+    {
+     "unit": "sera",
+     "team": "player",
+     "x": 3,
+     "y": 3,
+     "if": "sera_joined"
+    },
+    {
+     "unit": "imp_paladin",
+     "team": "enemy",
+     "x": 8,
+     "y": 5
+    },
+    {
+     "unit": "imp_knight",
+     "team": "enemy",
+     "x": 9,
+     "y": 3,
+     "ai": "guard",
+     "level": 8
+    },
+    {
+     "unit": "imp_sniper",
+     "team": "enemy",
+     "x": 12,
+     "y": 5,
+     "ai": "hold"
+    },
+    {
+     "unit": "imp_mage",
+     "team": "enemy",
+     "x": 13,
+     "y": 2,
+     "level": 9
+    },
+    {
+     "unit": "imp_cleric",
+     "team": "enemy",
+     "x": 14,
+     "y": 3,
+     "ai": "guard",
+     "level": 7
+    },
+    {
+     "unit": "soldier",
+     "team": "enemy",
+     "x": 13,
+     "y": 8,
+     "level": 9
+    },
+    {
+     "unit": "emperor",
+     "team": "enemy",
+     "x": 15,
+     "y": 2,
+     "ai": "hold",
+     "boss": true
+    }
+   ],
+   "victory": {
+    "type": "seize",
+    "x": 15,
+    "y": 2
+   },
+   "defeat": {
+    "type": "lordDies"
+   },
+   "events": [
+    {
+     "on": "start",
+     "script": "ch5_intro"
+    },
+    {
+     "on": "turn",
+     "turn": 4,
+     "phase": "enemy",
+     "script": "ch5_reinf"
+    },
+    {
+     "on": "death",
+     "unit": "emperor",
+     "script": "ch5_emperor"
+    },
+    {
+     "on": "victory",
+     "script": "ch5_end"
+    }
+   ],
    "next": []
   }
  },
@@ -1882,6 +3129,185 @@ window.SRPG_DEFAULT_CAMPAIGN = {
   }
  },
  "scripts": {
+  "ch4_intro": [
+   {
+    "cmd": "narrate",
+    "text": "帝國軍撤退到斷崖峽谷，闇術師赫爾加在此布陣。"
+   },
+   {
+    "cmd": "say",
+    "who": "mira",
+    "text": "艾倫大人，這是在沃斯將軍營帳找到的騎士勳章。等級夠的人就能轉職成上級職業。"
+   },
+   {
+    "cmd": "give",
+    "unit": "alan",
+    "item": "master_seal"
+   },
+   {
+    "cmd": "gold",
+    "add": 3000
+   },
+   {
+    "cmd": "say",
+    "who": "alan",
+    "side": "right",
+    "text": "出擊準備時也能用軍資金「改造」武器與能力……大家做好準備！"
+   },
+   {
+    "cmd": "narrate",
+    "text": "【提示】轉職：Lv5 以上在戰鬥中對自己使用「騎士勳章」。改造：出擊準備畫面的「改造」分頁。"
+   }
+  ],
+  "ch4_reinf": [
+   {
+    "cmd": "say",
+    "who": "helga",
+    "text": "呵呵……天馬隊，從斷崖上包抄他們！"
+   },
+   {
+    "cmd": "spawn",
+    "units": [
+     {
+      "unit": "imp_pegasus",
+      "team": "enemy",
+      "x": 15,
+      "y": 0
+     }
+    ]
+   }
+  ],
+  "ch4_helga": [
+   {
+    "cmd": "say",
+    "who": "helga",
+    "text": "皇帝陛下……臣……"
+   },
+   {
+    "cmd": "gold",
+    "add": 2500
+   }
+  ],
+  "ch4_end": [
+   {
+    "cmd": "say",
+    "who": "alan",
+    "side": "right",
+    "text": "前面就是帝都。結束這一切吧。"
+   }
+  ],
+  "ch5_intro": [
+   {
+    "cmd": "narrate",
+    "text": "帝都・皇城。皇帝傑羅斯坐鎮王座。"
+   },
+   {
+    "cmd": "say",
+    "who": "emperor",
+    "text": "邊境的小鬼，你以為憑那點人就能改變這個國家？"
+   },
+   {
+    "cmd": "say",
+    "who": "alan",
+    "side": "right",
+    "text": "改變它的不是我，是所有不想再打仗的人！"
+   },
+   {
+    "cmd": "narrate",
+    "text": "【勝利條件】擊敗皇帝後，由艾倫壓制王座(K)。"
+   }
+  ],
+  "ch5_reinf": [
+   {
+    "cmd": "say",
+    "who": "emperor",
+    "text": "近衛隊，出擊！"
+   },
+   {
+    "cmd": "spawn",
+    "units": [
+     {
+      "unit": "imp_paladin",
+      "team": "enemy",
+      "x": 16,
+      "y": 5
+     },
+     {
+      "unit": "imp_sniper",
+      "team": "enemy",
+      "x": 16,
+      "y": 8
+     }
+    ]
+   }
+  ],
+  "ch5_emperor": [
+   {
+    "cmd": "say",
+    "who": "emperor",
+    "text": "……原來，這就是晨星的光嗎……"
+   }
+  ],
+  "ch5_end": [
+   {
+    "cmd": "narrate",
+    "text": "王座被壓制，長年的戰火終於熄滅。"
+   },
+   {
+    "cmd": "if",
+    "flag": "sera_joined",
+    "goto": "sera"
+   },
+   {
+    "cmd": "goto",
+    "label": "k"
+   },
+   {
+    "cmd": "label",
+    "name": "sera"
+   },
+   {
+    "cmd": "say",
+    "who": "sera",
+    "text": "天馬隊的同伴們，終於可以回家了。"
+   },
+   {
+    "cmd": "label",
+    "name": "k"
+   },
+   {
+    "cmd": "if",
+    "flag": "kit_trust",
+    "goto": "kit"
+   },
+   {
+    "cmd": "goto",
+    "label": "fin"
+   },
+   {
+    "cmd": "label",
+    "name": "kit"
+   },
+   {
+    "cmd": "say",
+    "who": "kit",
+    "text": "老大，以後也讓我跟著你吧。"
+   },
+   {
+    "cmd": "label",
+    "name": "fin"
+   },
+   {
+    "cmd": "say",
+    "who": "alan",
+    "side": "right",
+    "text": "謝謝大家。這個國家的晨星，是我們每一個人。"
+   },
+   {
+    "cmd": "narrate",
+    "text": "── 示範劇本《邊境的晨星》完 ── 用編輯器來寫你自己的故事吧！"
+   }
+  ],
   "sup_alan_mira_c": [
    {
     "cmd": "say",
@@ -2366,7 +3792,7 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    },
    {
     "cmd": "narrate",
-    "text": "── 示範劇本 完 ── 用編輯器來寫你自己的故事吧！"
+    "text": "帝國軍向斷崖峽谷撤退，艾倫一行人緊追在後。"
    }
   ]
  }

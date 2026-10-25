@@ -675,6 +675,7 @@ test('動作影格：待機/攻擊/受擊選擇', () => {
   assert.equal(SPR.poseFrames({ frames: [['.']] }, 'attack'), null);
   assert.equal(SPR.pickFrame(sp, 'hurt', 0), 3);
   assert.equal(SPR.pickFrame({ frames: [['.'], ['.']] }, 'attack', 500, 400), 1);   // 沒有攻擊影格 → 用待機
+  assert.equal(SPR.pickFrame(sp, 'idle', -50, 400), 0);   // 負的時間也不會出錯
 });
 
 test('新演出模板與地圖兵器預設演出', () => {
@@ -682,4 +683,11 @@ test('新演出模板與地圖兵器預設演出', () => {
   for (const id of ['charge', 'volley', 'magic_dark', 'magic_heal', 'map_burst', 'map_line']) assert.ok(c.animations[id], id);
   assert.equal(M.animFor(c, { type: 'anima', map: { shape: 'burst' } }), 'map_burst');
   assert.equal(M.animFor(c, { type: 'lance', map: { shape: 'line' } }), 'map_line');
+});
+
+test('平衡統計工具：整套劇本可自動跑完不出錯', () => {
+  const T = require(path.join(ROOT, 'tools/balance.js'));
+  const c = T.loadCampaign(path.join(ROOT, 'data/demo-campaign.js'));
+  const stats = T.simulate(c, 2, { retries: 1 });
+  assert.ok(stats.ch1 && stats.ch1.runs === 2);
 });
