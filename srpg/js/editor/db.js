@@ -5,7 +5,7 @@
   const C = SRPG.campaign;
   const MOVE_TYPES = [['foot', '步行'], ['horse', '騎馬'], ['armor', '重甲'], ['fly', '飛行']];
   const WTYPES = [['sword', '劍'], ['lance', '槍'], ['axe', '斧'], ['bow', '弓'], ['anima', '理魔法'], ['light', '光魔法'], ['dark', '闇魔法'], ['staff', '杖（治療）'], ['other', '其他']];
-  const ITEM_KINDS = [['heal', '回復 HP'], ['boost', '永久提升能力'], ['sp', '回復 SP'], ['mp', '回復法力 MP'], ['st', '回復體力'], ['morale', '提升氣力']];
+  const ITEM_KINDS = [['heal', '回復 HP'], ['boost', '永久提升能力'], ['sp', '回復 SP'], ['mp', '回復法力 MP'], ['st', '回復體力'], ['morale', '提升氣力'], ['promote', '轉職道具']];
   const SPIRIT_TARGETS = [['self', '自己'], ['ally', '指定同伴'], ['allies', '全體同伴']];
 
   // 圖示：顯示 + 點擊開啟選擇器
@@ -62,6 +62,8 @@
         ...ED.formRow('氣力系統', ED.check(m.rules = m.rules || {}, 'morale', 'SRW 風格：戰鬥/擊破提升氣力，傷害 × 攻方氣力 / 守方氣力')),
         ...ED.formRow('精神指令', ED.check(m.rules, 'spirits', 'SRW 風格：消耗 SP 發動必中、熱血、加速等')),
         ...ED.formRow('體力 / 法力', ED.check(m.rules, 'resources', '武器與杖可設定消耗體力或法力；每回合回復、待機可喘息')),
+        ...ED.formRow('改造', ED.check(m.rules, 'upgrades', 'SRW 風格：出擊準備畫面花軍資金強化武器與能力'), '上限', ED.num(m.rules, 'upgradeMax', { attrs: { placeholder: '5' } })),
+        ...ED.formRow('轉職', h('label', {}, h('input', { type: 'checkbox', checked: m.rules.promoteReset !== false, onchange: (e) => { if (e.target.checked) delete m.rules.promoteReset; else m.rules.promoteReset = false; ED.dirty(); } }), ' 轉職後等級回到 1（FE 風格）')),
         ...(m.rules.resources ? ED.formRow('回復量', '體力/回合', ED.num(m.rules, 'stRegen', { attrs: { placeholder: '3' } }), '法力/回合', ED.num(m.rules, 'mpRegen', { attrs: { placeholder: '2' } }), '待機喘息', ED.num(m.rules, 'restSt', { attrs: { placeholder: '3' } })) : [])),
       h('p.hint', {}, counts),
       h('h2', {}, '使用說明'),
@@ -126,7 +128,16 @@
         ...ED.formRow('標籤', h('input', { type: 'text', value: (c.tags || []).join(','), placeholder: 'fly,armor,horse（特效武器用）', onchange: (e) => { c.tags = e.target.value.split(',').map((s) => s.trim()).filter(Boolean); ED.dirty(); } })),
         ...ED.formRow('體力 / 法力', '體力', ED.num(c, 'st'), '法力', ED.num(c, 'mp'), h('span.hint', {}, '此職業角色的預設值')),
         ...ED.formRow('視野', ED.num(c, 'vision', { attrs: { placeholder: '3' } })),
-        ...ED.formRow('職業技能', idList(c, 'skills', 'skills', false)))));
+        ...ED.formRow('職業技能', idList(c, 'skills', 'skills', false))),
+      h('h3', {}, '轉職路線'),
+      ...(c.promote || []).map((p, i) => h('div.card', {},
+        h('div.row', {}, '轉職為', ED.select(p, 'to', ED.named('classes')), '需要等級', ED.num(p, 'level', { attrs: { placeholder: '1' } }),
+          '道具', ED.select(p, 'item', ED.named('items').filter(([k]) => ED.c.items[k].kind === 'promote'), { optional: true, optionalLabel: '（劇情轉職）' }),
+          h('button.danger', { onclick: () => { c.promote.splice(i, 1); if (!c.promote.length) delete c.promote; ED.dirty(true); } }, '✕')),
+        h('div.grid8', {}, ...C.STAT_KEYS.concat(['mp', 'st']).map((k) => h('label', {}, (C.STAT_NAMES[k] || (k === 'mp' ? '法力' : '體力')) + '+', ED.num(p.bonus = p.bonus || {}, k)))),
+        h('div.row', {}, '額外給予武器', idList(p, 'weapons', 'weapons', false)))),
+      h('button', { onclick: () => { (c.promote = c.promote || []).push({ to: Object.keys(ED.c.classes).find((k) => k !== id) || id, level: 10, bonus: { hp: 4, str: 2, def: 2 } }); ED.dirty(true); } }, '＋ 轉職路線'),
+      h('p.hint', {}, '設定「道具」時，角色在戰鬥中使用該轉職道具（道具效果選「轉職道具」）即可轉職；不設定道具時，用劇本指令「轉職」觸發。轉職會套用新職業的移動力、技能與外觀，並加上能力加成。')));
   };
 
   /* ---------- 武器 ---------- */
@@ -160,6 +171,7 @@
           ...(w.map ? [ED.select(w.map, 'shape', [['burst', '爆炸（射程內選中心）'], ['line', '直線（選方向）']]), '大小', ED.num(w.map, 'size'), ED.check(w.map, 'friendly', '會誤傷同伴')] : [])),
         ...ED.formRow('說明', ED.text(w, 'desc', { optional: true })),
         ...ED.formRow('價格', ED.num(w, 'price', { attrs: { placeholder: '500' } })),
+        ...ED.formRow('改造成長', '每級威力 +', ED.num(w, 'upMt', { attrs: { placeholder: '1' } }), '命中 +', ED.num(w, 'upHit', { attrs: { placeholder: '3' } })),
         ...ED.formRow('特效', h('input', { type: 'text', value: (w.effective || []).join(','), placeholder: '例如 fly（對飛行 3 倍威力）', onchange: (e) => { const v = e.target.value.split(',').map((s) => s.trim()).filter(Boolean); if (v.length) w.effective = v; else delete w.effective; ED.dirty(); } })))));
   };
 

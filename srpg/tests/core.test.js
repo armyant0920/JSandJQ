@@ -611,3 +611,75 @@ test('演出：武器對應、時間軸計算', () => {
   const sc = M.sceneFor(c, 'forest');
   assert.equal(sc.deco, 'trees');
 });
+
+/* ---------- M6b 轉職 / 改造 / 動作影格 ---------- */
+function mini4() {
+  const c = mini3();
+  c.meta.rules.upgrades = true;
+  c.items.seal = { name: '勳章', kind: 'promote', uses: 1 };
+  c.classes.hero = { name: '勇者', move: 6, moveType: 'foot', skills: ['luna'] };
+  c.classes.foot.promote = [{ to: 'hero', level: 5, item: 'seal', bonus: { hp: 5, str: 2 } }, { to: 'horse', level: 5, item: 'seal', bonus: { hp: 3 } }];
+  c.units.a.items = ['seal'];
+  c.units.a.weapons = ['sword'];
+  c.weapons.sword.price = 500;
+  return c;
+}
+
+test('轉職：等級條件、道具、能力加成、職業技能、等級重置', () => {
+  const c = mini4();
+  const b = B.createBattle(c, 'c', { seed: 1 });
+  const a = b.units[0];
+  assert.equal(B.itemUsable(b, a, 0), false);          // 等級不足
+  a.level = 5;
+  assert.equal(B.itemUsable(b, a, 0), true);
+  assert.equal(C.promotionOptions(c, a.cls, a.level, 'seal').length, 2);
+  const hp = a.stats.hp;
+  B.useItem(b, a, 0, { promoteTo: 'hero' });
+  assert.equal(a.cls, 'hero'); assert.equal(a.className, '勇者');
+  assert.equal(a.stats.hp, hp + 5); assert.equal(a.move, 6);
+  assert.ok(a.skills.includes('luna'));
+  assert.equal(a.level, 1);
+  const roster = B.commitRoster(b, {});
+  assert.equal(roster.a.cls, 'hero');
+  const b2 = B.createBattle(c, 'c', { roster, seed: 1 });
+  assert.equal(b2.units[0].cls, 'hero');
+  assert.equal(b2.units[0].move, 6);
+});
+
+test('改造：武器威力/命中、能力強化、費用與上限', () => {
+  const c = mini4();
+  c.meta.rules.upgradeMax = 2;
+  const party = { roster: {}, convoy: [], gold: 5000 };
+  const r1 = P.upgradeWeapon(c, party, 'a', 'sword');
+  assert.equal(r1.level, 1);
+  assert.equal(party.gold, 5000 - r1.cost);
+  P.upgradeWeapon(c, party, 'a', 'sword');
+  assert.equal(P.upgradeWeapon(c, party, 'a', 'sword').error, '已達上限');
+  const hp = party.roster.a.stats.hp;
+  P.upgradeUnit(c, party, 'a', 'hp');
+  assert.equal(party.roster.a.stats.hp, hp + 2);
+  const b = B.createBattle(c, 'c', { roster: party.roster, seed: 1 });
+  const [a, e] = b.units; e.x = 1; e.y = 0;
+  const up = B.previewAttack(b, a, e).att;
+  a.wup = {};
+  const base = B.previewAttack(b, a, e).att;
+  assert.equal(up.dmg, base.dmg + 2);
+});
+
+test('動作影格：待機/攻擊/受擊選擇', () => {
+  require(path.join(ROOT, 'js/render/sprites.js'));
+  const SPR = SRPG.sprites;
+  const sp = { w: 1, h: 1, palette: {}, frames: [['.'], ['.'], ['.'], ['.']], poses: { attack: [2], hurt: [3] } };
+  assert.deepEqual(SPR.poseFrames(sp, 'idle'), [0, 1]);
+  assert.deepEqual(SPR.poseFrames(sp, 'attack'), [2]);
+  assert.equal(SPR.poseFrames({ frames: [['.']] }, 'attack'), null);
+  assert.equal(SPR.pickFrame(sp, 'hurt', 0), 3);
+  assert.equal(SPR.pickFrame({ frames: [['.'], ['.']] }, 'attack', 500, 400), 1);   // 沒有攻擊影格 → 用待機
+});
+
+test('新演出模板與地圖兵器預設演出', () => {
+  const c = loadDemo();
+  for (const id of ['charge', 'volley', 'magic_dark', 'magic_heal', 'map_burst', 'map_line']) assert.ok(c.animations[id], id);
+  assert.equal(M.animFor(c, { type: 'anima', map: { shape: 'burst' } }), 'map_burst');
+  assert.equal(M.animFor(c, { type: 'lance', map: { shape: 'line' } }), 'map_line');
+});

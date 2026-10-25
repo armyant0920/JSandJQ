@@ -111,7 +111,8 @@
     const n = SP.frameCount(sp);
     const isImg = sp && sp.image;
     const bob = opts.still || isImg ? 0 : Math.round(Math.sin((t || 0) / 300 + (u.uid || 0)) * 1.5);
-    const fi = opts.still ? (isImg ? 1 : 0) : (n > 1 ? Math.floor((t || 0) / (isImg ? 220 : 400) + (u.uid || 0)) % n : 0);
+    const fi = isImg ? (opts.still ? 1 : (n > 1 ? Math.floor((t || 0) / 220 + (u.uid || 0)) % n : 0))
+      : (opts.still ? (SP.poseFrames(sp, 'idle') || [0])[0] : SP.pickFrame(sp, 'idle', t, 400, u.uid || 0));
     const tc = SP.TEAM_COLORS[u.team] || SP.TEAM_COLORS.none;
     ctx.save();
     if (opts.gray) ctx.filter = 'grayscale(1) brightness(0.8)';

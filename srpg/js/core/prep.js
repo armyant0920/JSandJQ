@@ -16,7 +16,7 @@
     const def = c.units[id];
     if (!def) return null;
     const u = C.makeUnit(c, { unit: id, team: 'enemy', x: 0, y: 0 }, null, 0);
-    roster[id] = { level: u.level, exp: 0, stats: clone(u.stats), weapons: clone(u.weapons), items: clone(u.items), skills: clone(u.skills), dead: false };
+    roster[id] = { level: u.level, exp: 0, stats: clone(u.stats), weapons: clone(u.weapons), items: clone(u.items), skills: clone(u.skills), cls: u.cls, wup: {}, upg: {}, dead: false };
     return roster[id];
   }
 
@@ -130,6 +130,35 @@
     return giveTo(c, party, unitId, e.id, e.uses);
   }
 
-  SRPG.prep = { ensureRoster, deployInfo, defaultSelection, assignSlots, priceOf, kindOf, giveTo, buy, sell, toConvoy, fromConvoy };
+  /* ---------- 改造（rules.upgrades） ---------- */
+  const UNIT_UPGRADES = { hp: { name: '最大 HP', step: 2 }, def: { name: '守備', step: 1 }, res: { name: '魔防', step: 1 } };
+  const maxUp = (c) => ((c.meta && c.meta.rules && c.meta.rules.upgradeMax) || 5);
+  function weaponUpgradeCost(c, wid, lvl) { return Math.round(((c.weapons[wid] || {}).price || 500) * 0.4 * (lvl + 1) / 50) * 50; }
+  function unitUpgradeCost(c, stat, lvl) { return 400 * (lvl + 1); }
+  function upgradeWeapon(c, party, unitId, wid) {
+    const r = ensureRoster(c, party.roster, unitId);
+    if (!r.weapons.includes(wid)) return { error: '沒有這把武器' };
+    r.wup = r.wup || {};
+    const lvl = r.wup[wid] || 0;
+    if (lvl >= maxUp(c)) return { error: '已達上限' };
+    const cost = weaponUpgradeCost(c, wid, lvl);
+    if ((party.gold || 0) < cost) return { error: '金錢不足' };
+    party.gold -= cost; r.wup[wid] = lvl + 1;
+    return { cost, level: lvl + 1 };
+  }
+  function upgradeUnit(c, party, unitId, stat) {
+    const r = ensureRoster(c, party.roster, unitId);
+    const up = UNIT_UPGRADES[stat];
+    if (!up) return { error: '無此項目' };
+    r.upg = r.upg || {};
+    const lvl = r.upg[stat] || 0;
+    if (lvl >= maxUp(c)) return { error: '已達上限' };
+    const cost = unitUpgradeCost(c, stat, lvl);
+    if ((party.gold || 0) < cost) return { error: '金錢不足' };
+    party.gold -= cost; r.upg[stat] = lvl + 1; r.stats[stat] += up.step;
+    return { cost, level: lvl + 1 };
+  }
+
+  SRPG.prep = { UNIT_UPGRADES, weaponUpgradeCost, unitUpgradeCost, upgradeWeapon, upgradeUnit, ensureRoster, deployInfo, defaultSelection, assignSlots, priceOf, kindOf, giveTo, buy, sell, toConvoy, fromConvoy };
   if (typeof module !== 'undefined' && module.exports) module.exports = SRPG;
 })(typeof window !== 'undefined' ? window : globalThis);

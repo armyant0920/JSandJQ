@@ -3,7 +3,7 @@
   'use strict';
   const { h } = ED;
   const CMDS = [['say', '💬 說話'], ['narrate', '📜 旁白'], ['choice', '🔀 選項'], ['label', '🏷 標籤'], ['goto', '↪ 跳轉'],
-    ['set', '🚩 設定旗標'], ['if', '❓ 條件跳轉'], ['spawn', '⚔ 增援'], ['recruit', '🤝 說服加入'], ['give', '🎁 給予物品'], ['gold', '💰 軍資金'], ['learn', '🌀 學會技能'], ['end', '⏹ 結束']];
+    ['set', '🚩 設定旗標'], ['if', '❓ 條件跳轉'], ['spawn', '⚔ 增援'], ['recruit', '🤝 說服加入'], ['give', '🎁 給予物品'], ['gold', '💰 軍資金'], ['learn', '🌀 學會技能'], ['promote', '🎖 轉職'], ['end', '⏹ 結束']];
   const TEAMS = [['enemy', '敵方'], ['player', '我方'], ['ally', '友軍']];
   const TEMPLATES = {
     say: () => ({ cmd: 'say', who: Object.keys(ED.c.units)[0], text: '' }),
@@ -17,6 +17,7 @@
     recruit: () => ({ cmd: 'recruit', unit: Object.keys(ED.c.units)[0] }),
     give: () => ({ cmd: 'give', unit: Object.keys(ED.c.units)[0], weapon: Object.keys(ED.c.weapons)[0] }),
     gold: () => ({ cmd: 'gold', add: 1000 }),
+    promote: () => ({ cmd: 'promote', unit: Object.keys(ED.c.units)[0], to: Object.keys(ED.c.classes)[0] }),
     learn: () => ({ cmd: 'learn', unit: Object.keys(ED.c.units)[0], skill: Object.keys(ED.c.skills)[0] }),
     end: () => ({ cmd: 'end' }),
   };
@@ -82,6 +83,7 @@
           kind.k === 'item' ? ED.select(cmd, 'item', ED.named('items')) : ED.select(cmd, 'weapon', ED.named('weapons')))];
       }
       case 'gold': return [h('div.row', {}, '軍資金增減', ED.num(cmd, 'add'), h('span.hint', {}, '負數為扣除'))];
+      case 'promote': return [h('div.row', {}, '讓', ED.select(cmd, 'unit', units), '轉職為', ED.select(cmd, 'to', ED.named('classes')))];
       case 'learn': return [h('div.row', {}, '讓', ED.select(cmd, 'unit', units), '學會', ED.select(cmd, 'skill', ED.named('skills')))];
       default: return [h('span.hint', {}, cmd.cmd === 'end' ? '結束這段劇本' : JSON.stringify(cmd))];
     }

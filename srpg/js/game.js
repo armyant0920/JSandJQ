@@ -214,6 +214,11 @@
       },
       recruit: (id2) => { const u = b && B.recruit(b, id2); if (u) fx(u.x, u.y, '加入我方！', '#8fb4ff'); },
       gold: (n) => { G.gold = Math.max(0, G.gold + n); UI.toast((n >= 0 ? '獲得 ' : '失去 ') + Math.abs(n) + ' 金'); updateHud(); },
+      promote: (uid, to) => {
+        const u = b && b.units.find((x) => x.id === uid && x.hp > 0);
+        if (u) { B.promote(b, u, to, (G.campaign.classes[u.cls].promote || []).find((p) => p.to === to)); fx(u.x, u.y, '轉職 ' + u.className, '#ffd24a'); }
+        else if (G.roster[uid]) G.roster[uid].cls = to;
+      },
       learn: (uid, sk) => {
         const u = b && B.learn(b, uid, sk);
         const name = (G.campaign.skills[sk] || {}).name || sk;
@@ -372,10 +377,11 @@
     updateHud();
   }
 
-  async function doItem(u, idx) {
+  async function doItem(u, idx, promoteTo) {
     const def = G.campaign.items[(u.items[idx] || {}).id] || {};
-    const r = B.useItem(G.battle, u, idx);
+    const r = B.useItem(G.battle, u, idx, { promoteTo });
     if (!r) return;
+    if (def.kind === 'promote') { UI.sfx('levelup'); await UI.banner('轉職！', u.name + ' → ' + u.className, '#ffd24a', 1200); }
     UI.sfx('heal');
     fx(u.x, u.y, (def.name || '') + ' ' + r.text, '#5ae07a');
     await UI.sleep(600);
@@ -441,8 +447,9 @@
     if (!res) return B.wait(b, u);
     const finals = new Map(victims.map((v) => [v.uid, v.hp]));
     for (const v of victims) v.hp = before.get(v.uid);
-    UI.sfx('magic');
-    await UI.banner(w.name || '地圖兵器', u.name, '#ffb44a', 700);
+    const animId = SRPG.media.animFor(G.campaign, w);
+    if (SET.get('scene') !== 'off' && animId && (!G.vis || visible(u))) await SRPG.scene.overlay({ campaign: G.campaign, anim: animId, unit: u, weaponName: w.name || w.id, speed: speed() });
+    else { UI.sfx('magic'); await UI.banner(w.name || '地圖兵器', u.name, '#ffb44a', 700); }
     G.flash = { tiles: res.area, t0: performance.now() };
     await UI.sleep(400);
     for (const st of res.strikes) {
@@ -834,11 +841,20 @@
         return apply();
       }
       case 'item': {
-        const list = me.items.map((it, i) => { const d = G.campaign.items[it.id] || {}; return { id: i, name: d.name || it.id, icon: d.icon, note: '×' + it.uses, title: d.desc || '' }; });
+        const list = me.items.map((it, i) => { const d = G.campaign.items[it.id] || {}; return { id: i, name: d.name || it.id, icon: d.icon, note: '×' + it.uses, title: d.desc || '', disabled: !B.itemUsable(b, me, i) }; });
         const idx = await menuAt(list);
         if (idx == null) return actionMenu(me);
+        const idef = G.campaign.items[me.items[idx].id] || {};
+        let promoteTo;
+        if (idef.kind === 'promote') {
+          const routes = C.promotionOptions(G.campaign, me.cls, me.level, me.items[idx].id).filter((p) => p.item === me.items[idx].id);
+          if (routes.length > 1) {
+            promoteTo = await menuAt(routes.map((p) => ({ id: p.to, name: '轉職：' + ((G.campaign.classes[p.to] || {}).name || p.to) })));
+            if (promoteTo == null) return actionMenu(me);
+          }
+        }
         G.mode = 'busy';
-        await doItem(me, idx);
+        await doItem(me, idx, promoteTo);
         return postAction(me);
       }
       case 'trade': {

@@ -16,6 +16,9 @@
     resources: false,     // 體力(ST)/法力(MP)：武器與杖可設定消耗
     stRegen: 3, mpRegen: 2, restSt: 3,   // 每回合回復量、待機額外回復體力
     supportRange: 3,      // 支援效果範圍
+    upgrades: false,      // SRW 式改造（出擊準備畫面花錢強化）
+    upgradeMax: 5,
+    promoteReset: true,   // 轉職後等級回到 1
   };
   // 武器相剋：key 剋 value
   const TRIANGLE = { sword: 'axe', axe: 'lance', lance: 'sword', anima: 'light', light: 'dark', dark: 'anima' };
@@ -229,7 +232,9 @@
     for (const sk of skillsOf(b, me)) if (sk.effect === 'bonus') for (const k in myBonus) myBonus[k] += sk[k] || 0;
     for (const sk of skillsOf(b, other)) if (sk.effect === 'bonus') for (const k in otBonus) otBonus[k] += sk[k] || 0;
     const sMe = supportBonus(b, me), sOt = supportBonus(b, other);
-    let mt = w.mt || 0;
+    // 改造等級（每級威力 +upMt、命中 +upHit）
+    const wl = (me.wup && me.wup[w.id]) || 0;
+    let mt = (w.mt || 0) + wl * (w.upMt != null ? w.upMt : 1);
     if (w.effective && w.effective.some((t) => (other.tags || []).includes(t))) mt *= R.effectiveMult;
     let tri = 0;
     if (!opts.ignoreRange) {
@@ -250,7 +255,7 @@
     const dmgLuna = finish(Math.max(0, atk));
     if (mb.valor) tags.push('熱血');
     if (ob.ironWall) tags.push('對方鐵壁');
-    let hitRaw = (w.hit || 0) + ms.skl * 2 + Math.floor(me.stats.lck / 2) + tri * R.triangleHit + myBonus.hit + sMe.hit;
+    let hitRaw = (w.hit || 0) + wl * (w.upHit != null ? w.upHit : 3) + ms.skl * 2 + Math.floor(me.stats.lck / 2) + tri * R.triangleHit + myBonus.hit + sMe.hit;
     let avo = os.spd * 2 + other.stats.lck + (tOther.avo || 0) + otBonus.avo + sOt.avo;
     if (mb.focus) { hitRaw += 30; tags.push('集中'); }
     if (ob.focus) avo += 30;

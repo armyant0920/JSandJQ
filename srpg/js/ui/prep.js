@@ -25,7 +25,8 @@
 
     return new Promise((resolve) => {
       const draw = () => {
-        const tabs = [['deploy', `出擊（${selected.length}/${info.slots.length}）`], ['equip', '整備'], ...(ch.shop && ch.shop.length ? [['shop', '商店']] : [])];
+        const rules = (c.meta && c.meta.rules) || {};
+        const tabs = [['deploy', `出擊（${selected.length}/${info.slots.length}）`], ['equip', '整備'], ...(ch.shop && ch.shop.length ? [['shop', '商店']] : []), ...(rules.upgrades ? [['upgrade', '改造']] : [])];
         let body = '';
         if (tab === 'deploy') {
           body = `<p class="hint">選擇要出擊的角色（★ 為必定出擊）。出擊位置 ${info.slots.length} 個。</p><div class="pgrid">` +
@@ -41,13 +42,26 @@
           const inv = cur ? invOf(cur).map((x) => `<div class="prow">${icon(x.d)} ${esc(x.d.name || x.id)}${x.uses != null ? ' ×' + x.uses : ''}
             <span class="sp"></span>${tab === 'equip' ? `<button class="btn sm" data-tc="${x.kind}:${x.i}">→ 輸送隊</button>` : `<button class="btn sm" data-sell="${x.kind}:${x.i}">賣出 ${Math.floor(P.priceOf(c, x.id) / 2)}</button>`}</div>`).join('') || '<p class="hint">（沒有物品）</p>' : '';
           let right = '';
-          if (tab === 'equip') {
+          if (tab === 'upgrade') {
+            const r = party.roster[cur];
+            const max = rules.upgradeMax || 5;
+            const bar = (lv) => '■'.repeat(lv) + '□'.repeat(Math.max(0, max - lv));
+            right = `<h3>武器改造（每級威力 +1、命中 +3）</h3>` + r.weapons.filter((w, i, a) => a.indexOf(w) === i).map((wid) => {
+              const d = c.weapons[wid] || {}; const lv = (r.wup || {})[wid] || 0; const cost = P.weaponUpgradeCost(c, wid, lv);
+              return `<div class="prow">${icon(d)} ${esc(d.name || wid)} <small>${bar(lv)}</small><span class="sp"></span>${lv >= max ? '<small>MAX</small>' : `<button class="btn sm" data-upw="${wid}" ${party.gold < cost ? 'disabled' : ''}>強化 ${cost} 金</button>`}</div>`;
+            }).join('') + `<h3>能力改造</h3>` + Object.entries(P.UNIT_UPGRADES).map(([k, up]) => {
+              const lv = (r.upg || {})[k] || 0; const cost = P.unitUpgradeCost(c, k, lv);
+              return `<div class="prow">${esc(up.name)} +${up.step}／級 <small>${bar(lv)}　目前 ${r.stats[k]}</small><span class="sp"></span>${lv >= max ? '<small>MAX</small>' : `<button class="btn sm" data-upu="${k}" ${party.gold < cost ? 'disabled' : ''}>強化 ${cost} 金</button>`}</div>`;
+            }).join('');
+          } else if (tab === 'equip') {
             right = `<h3>輸送隊（${party.convoy.length}）</h3>` + (party.convoy.map((e, i) => { const d = (e.kind === 'weapon' ? c.weapons : c.items)[e.id] || {}; return `<div class="prow">${icon(d)} ${esc(d.name || e.id)}${e.uses != null ? ' ×' + e.uses : ''}<span class="sp"></span><button class="btn sm" data-fc="${i}">給 ${esc(nameOf(cur))}</button></div>`; }).join('') || '<p class="hint">（空）</p>');
           } else {
             right = `<h3>商品</h3>` + ch.shop.map((id) => { const d = c.weapons[id] || c.items[id] || {}; const pr = P.priceOf(c, id); return `<div class="prow" title="${esc(d.desc || '')}">${icon(d)} ${esc(d.name || id)}<span class="sp"></span><small>${pr} 金</small>
               <button class="btn sm" data-buy="${id}" ${party.gold < pr ? 'disabled' : ''}>買給 ${esc(nameOf(cur))}</button><button class="btn sm" data-buyc="${id}" ${party.gold < pr ? 'disabled' : ''}>買到輸送隊</button></div>`; }).join('');
           }
-          body = `<div class="pcols"><div class="plist">${unitList}</div><div><h3>${esc(nameOf(cur))} 的物品</h3>${inv}</div><div>${right}</div></div>`;
+          const rr = party.roster[cur] || {};
+          const head = `<h3>${esc(nameOf(cur))}（${esc((c.classes[rr.cls || (c.units[cur] || {}).class] || {}).name || '')} Lv${rr.level || 1}）的物品</h3>`;
+          body = `<div class="pcols"><div class="plist">${unitList}</div><div>${head}${inv}</div><div>${right}</div></div>`;
         }
         el.innerHTML = `<h2>出擊準備：${esc(ch.name || opts.chapterId)}</h2>
           <div class="row ptabs">${tabs.map(([k, l]) => `<button class="btn ${tab === k ? 'primary' : ''}" data-tab="${k}">${l}</button>`).join('')}<span class="sp"></span><span class="pill">💰 ${party.gold} 金</span></div>
@@ -65,6 +79,8 @@
         el.querySelectorAll('[data-tc]').forEach((b) => (b.onclick = () => { const [k, i] = b.dataset.tc.split(':'); P.toConvoy(c, party, cur, k, +i); draw(); }));
         el.querySelectorAll('[data-fc]').forEach((b) => (b.onclick = () => { P.fromConvoy(c, party, cur, +b.dataset.fc); draw(); }));
         el.querySelectorAll('[data-sell]').forEach((b) => (b.onclick = () => { const [k, i] = b.dataset.sell.split(':'); const r = P.sell(c, party, cur, k, +i); UI.toast(r.error || `賣出 +${r.price} 金`); draw(); }));
+        el.querySelectorAll('[data-upw]').forEach((b) => (b.onclick = () => { const r = P.upgradeWeapon(c, party, cur, b.dataset.upw); if (!r.error) UI.sfx('levelup'); UI.toast(r.error || `改造完成 Lv${r.level}`); draw(); }));
+        el.querySelectorAll('[data-upu]').forEach((b) => (b.onclick = () => { const r = P.upgradeUnit(c, party, cur, b.dataset.upu); if (!r.error) UI.sfx('levelup'); UI.toast(r.error || `改造完成 Lv${r.level}`); draw(); }));
         el.querySelectorAll('[data-buy],[data-buyc]').forEach((b) => (b.onclick = () => {
           const r = P.buy(c, party, b.dataset.buy || b.dataset.buyc, b.dataset.buy ? cur : null);
           if (!r.error) UI.sfx('buy'); UI.toast(r.error || `購買 -${r.price} 金`); draw();

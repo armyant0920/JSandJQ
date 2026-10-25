@@ -60,6 +60,25 @@
     return (sp.frames || []).length;
   }
 
+  /* 動作影格：sp.poses = { idle:[影格索引…], attack:[…], hurt:[…] }
+     沒設定 idle 時，用「沒被 attack/hurt 使用的影格」當待機 */
+  function poseFrames(sp, pose) {
+    if (!sp || sp.image) return null;
+    const P = sp.poses || {};
+    if (P[pose] && P[pose].length) return P[pose].filter((i) => i < frameCount(sp));
+    if (pose !== 'idle') return null;
+    const used = new Set([].concat(P.attack || [], P.hurt || []));
+    const out = [];
+    for (let i = 0; i < frameCount(sp); i++) if (!used.has(i)) out.push(i);
+    return out.length ? out : [0];
+  }
+  // 依動作與時間挑影格（沒有該動作時退回待機）
+  function pickFrame(sp, pose, t, period, offset) {
+    const list = poseFrames(sp, pose) || poseFrames(sp, 'idle');
+    if (!list || !list.length) return 0;
+    return list[Math.floor((t || 0) / (period || 400) + (offset || 0)) % list.length];
+  }
+
   // 取得某影格的 canvas/image 與來源矩形
   function getFrame(sp, i, team, dir) {
     if (!sp) return null;
@@ -167,5 +186,5 @@
     ctx.fillText((name || '?').slice(0, 1), x + s / 2, y + s - 2);
   }
 
-  SRPG.sprites = { TEAM_COLORS, gridToCanvas, getFrame, frameCount, draw, drawIcon, iconStyle, preload, drawBust, tag, invalidate, loadImage, fallbackPortrait, onload: null };
+  SRPG.sprites = { poseFrames, pickFrame, TEAM_COLORS, gridToCanvas, getFrame, frameCount, draw, drawIcon, iconStyle, preload, drawBust, tag, invalidate, loadImage, fallbackPortrait, onload: null };
 })(typeof window !== 'undefined' ? window : globalThis);

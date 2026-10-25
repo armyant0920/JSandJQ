@@ -208,7 +208,7 @@
     if (R.mapWeapons(b, u).length) acts.push({ id: 'mapAttack', name: '地圖兵器' });
     const sp = spiritsUsable(b, u);
     if (sp.length) acts.push({ id: 'spirit', name: '精神', free: true, disabled: !sp.some((s) => (s.cost || 0) <= u.sp) });
-    if ((u.items || []).length) acts.push({ id: 'item', name: '道具' });
+    if ((u.items || []).length) acts.push({ id: 'item', name: '道具', disabled: !u.items.some((_, i) => itemUsable(b, u, i)) });
     if (u.team === 'player' && tradePartners(b, u).length) acts.push({ id: 'trade', name: '交換', free: true });
     if (u.team === 'player' && rescueTargets(b, u).length) acts.push({ id: 'rescue', name: '救出' });
     if (u.team === 'player' && dropTiles(b, u).length) acts.push({ id: 'drop', name: '放下' });
@@ -373,12 +373,49 @@
       case 'mp': { const n = Math.min(u.maxMp - u.mp, def.power || 10); u.mp += n; text = `MP +${n}`; break; }
       case 'st': { const n = Math.min(u.maxSt - u.st, def.power || 10); u.st += n; text = `體力 +${n}`; break; }
       case 'morale': R.addMorale(b, u, def.power || 10); text = `氣力 +${def.power || 10}`; break;
+      case 'promote': {
+        const opts2 = C.promotionOptions(b.campaign, u.cls, u.level, it.id).filter((p) => p.item === it.id);
+        const pick = opts2.find((p) => p.to === (opts && opts.promoteTo)) || opts2[0];
+        if (!pick) return null;
+        promote(b, u, pick.to, pick);
+        text = '轉職為 ' + u.className;
+        break;
+      }
       default: text = def.name;
     }
     it.uses = (it.uses || 1) - 1;
     if (it.uses <= 0) u.items.splice(idx, 1);
     if (!(opts && opts.free)) finishAction(b, u, true);
     return { text };
+  }
+
+  // 道具可否使用（轉職道具需要符合條件）
+  function itemUsable(b, u, idx) {
+    const it = (u.items || [])[idx];
+    const def = it && b.campaign.items[it.id];
+    if (!def) return false;
+    if (def.kind === 'promote') return C.promotionOptions(b.campaign, u.cls, u.level, it.id).some((p) => p.item === it.id);
+    return true;
+  }
+
+  // 轉職：改變職業、加上能力加成、取得新職業技能；route 為職業 promote 中的一筆
+  function promote(b, u, toCls, route) {
+    const c = b.campaign;
+    const nc = c.classes[toCls];
+    if (!nc) return null;
+    const def = c.units[u.id] || {};
+    const bonus = (route && route.bonus) || nc.bonus || {};
+    for (const k of C.STAT_KEYS) if (bonus[k]) { u.stats[k] += bonus[k]; if (k === 'hp') u.hp += bonus[k]; }
+    if (bonus.mp) { u.maxMp += bonus.mp; u.mp += bonus.mp; }
+    if (bonus.st) { u.maxSt += bonus.st; u.st += bonus.st; }
+    u.cls = toCls; u.className = nc.name || toCls;
+    u.move = nc.move || u.move; u.moveType = nc.moveType || u.moveType; u.tags = clone(nc.tags || []);
+    if (!def.sprite && nc.sprite) u.sprite = nc.sprite;
+    if (nc.vision) u.vision = nc.vision;
+    u.skills = [...new Set(u.skills.concat(nc.skills || []))];
+    for (const w of (route && route.weapons) || []) if (c.weapons[w]) u.weapons.push(w);
+    if (R.rulesOf(b).promoteReset) { u.level = 1; u.exp = 0; }
+    return u;
   }
 
   // 交換：把 from 的 weapons/items 第 idx 項移到 to（不結束行動）
@@ -510,7 +547,8 @@
       if (u.team !== 'player') continue;
       roster[u.id] = {
         level: u.level, exp: u.exp, stats: clone(u.stats), weapons: clone(u.weapons), items: clone(u.items || []),
-        skills: clone(u.skills || []), dead: permadeath && u.hp <= 0,
+        skills: clone(u.skills || []), cls: u.cls, wup: clone(u.wup || {}), upg: clone(u.upg || {}),
+        dead: permadeath && u.hp <= 0,
       };
     }
     return roster;
@@ -547,7 +585,7 @@
     healTargets, tradePartners, spiritsUsable, spiritTargets, rescueTargets, dropTiles, supportTargets, nextSupportRank,
     attack, mapAttack, heal, useItem, transfer, useSpirit, rescue, drop, supportTalk, gainSupportPoints,
     cantoMove, endCanto, talk, visit, seize, wait, startPhase, endPhase, phaseDone, checkOutcome,
-    objectiveText, commitRoster, spawn, recruit, give, learn,
+    objectiveText, commitRoster, spawn, recruit, give, learn, promote, itemUsable,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = SRPG;
 })(typeof window !== 'undefined' ? window : globalThis);

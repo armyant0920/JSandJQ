@@ -56,6 +56,9 @@
 - \`weapons\` 另有：cost(消耗量)、costType:"st"|"mp"(預設物理用體力、魔法與杖用法力)、map:{shape:"burst"|"line", size, friendly?}(地圖兵器)、price
 - \`skills\` 被動技能：{ name, effect, desc, ...參數 }；effect：${Object.entries(SRPG.rules.SKILL_EFFECTS).map(([k, e]) => k + '(' + e.name + (e.params.length ? ':' + e.params.join('/') : '') + ')').join('、')}；rate 可為數字或能力名（spd/skl/lck…）
 - \`classes\`/\`units\` 另有：skills:[技能id]、st、mp、vision(霧戰視野)
+- \`classes\` 另有 promote:[{ to:職業id, level:10, item?:轉職道具id, bonus:{hp,str,…,mp,st}, weapons?:[武器id] }]（轉職路線）；道具 kind:"promote" 為轉職道具
+- \`weapons\` 另有 upMt / upHit（每級改造的威力與命中加成，預設 1 / 3）；\`meta.rules.upgrades\`:true 開啟改造
+- 精靈圖可加 poses:{ attack:[影格索引], hurt:[影格索引] }（其餘影格為待機）
 - \`supports\` 支援：{ "id": { a:角色id, b:角色id, ranks:[{rank:"C"|"B"|"A", need:支援值, script:劇本id}] } }
 - \`sprites\` / \`portraits\` 像素圖（見下）
 - \`chapters\` 章節、\`scripts\` 劇本對話（見下）
@@ -115,7 +118,7 @@
   {"cmd":"if","flag":"旗標","goto":"標籤","else":"標籤"}  // 也可加 "gte":2 / "eq":值；flag 前加 ! 表示否定
   {"cmd":"spawn","units":[{"unit":"id","team":"enemy","x":0,"y":0}]},
   {"cmd":"recruit","unit":"id"}, {"cmd":"give","unit":"id","weapon":"武器id"} 或 {"cmd":"give","unit":"id","item":"道具id"},
-  {"cmd":"gold","add":1000}, {"cmd":"learn","unit":"id","skill":"技能id"}, {"cmd":"end"} ]
+  {"cmd":"gold","add":1000}, {"cmd":"learn","unit":"id","skill":"技能id"}, {"cmd":"promote","unit":"id","to":"職業id"}, {"cmd":"end"} ]
 \`\`\`
 - 沒有角色的人物可用 {"cmd":"say","name":"村長","text":"..."}。
 - 每個 goto / 選項跳轉的標籤都必須存在於同一段劇本。`);

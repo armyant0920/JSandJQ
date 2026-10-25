@@ -93,6 +93,45 @@
       { type: 'projectile', kind: 'bolt', color: '#fff27a', size: 4, ms: 120, with: true },
       { type: 'particles', kind: 'spark', at: 'target', color: '#fff27a', count: 16, ms: 300 },
       { type: 'hit' }, { type: 'wait', ms: 200 }] },
+    charge: { name: '突進', steps: [
+      { type: 'move', who: 'self', to: 'back', ms: 160 },
+      { type: 'particles', kind: 'ring', at: 'self', color: '#9fd8ff', count: 10, ms: 220, with: true },
+      { type: 'move', who: 'self', to: 'target', ms: 110 },
+      { type: 'sound', id: 'swing' },
+      { type: 'particles', kind: 'spark', at: 'target', color: '#ffffff', count: 14, ms: 300, with: true },
+      { type: 'shake', power: 7, ms: 220, with: true },
+      { type: 'hit' }, { type: 'wait', ms: 150 },
+      { type: 'move', who: 'self', to: 'home', ms: 240 }] },
+    volley: { name: '連射', steps: [
+      { type: 'sound', id: 'arrow' },
+      { type: 'projectile', kind: 'arrow', color: '#e8e0c0', size: 3, ms: 260 },
+      { type: 'projectile', kind: 'arrow', color: '#e8e0c0', size: 3, ms: 300, with: true },
+      { type: 'sound', id: 'arrow' },
+      { type: 'projectile', kind: 'arrow', color: '#ffe27a', size: 4, ms: 240 },
+      { type: 'hit' }, { type: 'wait', ms: 200 }] },
+    magic_dark: { name: '暗黑魔法', steps: [
+      { type: 'tint', color: 'rgba(30,0,40,0.5)', ms: 900, async: true },
+      { type: 'sound', id: 'magic' },
+      { type: 'particles', kind: 'ring', at: 'target', color: '#b05aff', count: 14, ms: 400 },
+      { type: 'particles', kind: 'burst', at: 'target', color: '#7a2aff', count: 20, ms: 350 },
+      { type: 'hit' }, { type: 'wait', ms: 200 }] },
+    magic_heal: { name: '回復魔法', steps: [
+      { type: 'sound', id: 'heal' },
+      { type: 'particles', kind: 'heal', at: 'target', color: '#8affb0', count: 16, ms: 600 },
+      { type: 'hit' }, { type: 'wait', ms: 200 }] },
+    map_burst: { name: '地圖兵器：爆炸', cutin: true, steps: [
+      { type: 'tint', color: 'rgba(40,10,0,0.45)', ms: 1300, async: true },
+      { type: 'cutin', text: '{weapon}！', color: '#ffb44a', ms: 900, with: true },
+      { type: 'sound', id: 'magic' },
+      { type: 'flash', color: '#ffb04a', ms: 250 },
+      { type: 'shake', power: 10, ms: 300, with: true },
+      { type: 'hit' }] },
+    map_line: { name: '地圖兵器：直線', cutin: true, steps: [
+      { type: 'cutin', text: '{weapon}！', color: '#9fd8ff', ms: 900 },
+      { type: 'sound', id: 'crit' },
+      { type: 'shake', power: 12, ms: 350 },
+      { type: 'flash', color: '#ffffff', ms: 200, with: true },
+      { type: 'hit' }] },
     special_meteor: { name: '必殺技：流星斬', cutin: true, steps: [
       { type: 'tint', color: 'rgba(10,10,40,0.6)', ms: 1800, async: true },
       { type: 'cutin', text: '{weapon}！', color: '#ffd24a', ms: 900, with: true },
@@ -144,6 +183,7 @@
   function animFor(c, w) {
     if (!w) return null;
     if (w.anim && c.animations[w.anim]) return w.anim;
+    if (w.map) { const m = w.map.shape === 'line' ? 'map_line' : 'map_burst'; if (c.animations[m]) return m; }
     const d = DEFAULT_ANIM_BY_TYPE[w.type] || 'slash';
     return c.animations[d] ? d : Object.keys(c.animations)[0] || null;
   }

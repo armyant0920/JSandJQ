@@ -89,7 +89,13 @@
       for (const sp of u.spirits || []) if (!c.spirits[sp]) errs.push(`角色 ${id} 的精神指令 ${sp} 不存在`);
       for (const sk of u.skills || []) if (!c.skills[sk]) errs.push(`角色 ${id} 的技能 ${sk} 不存在`);
     }
-    for (const [id, cl] of Object.entries(c.classes)) for (const sk of cl.skills || []) if (!c.skills[sk]) errs.push(`職業 ${id} 的技能 ${sk} 不存在`);
+    for (const [id, cl] of Object.entries(c.classes)) {
+      for (const sk of cl.skills || []) if (!c.skills[sk]) errs.push(`職業 ${id} 的技能 ${sk} 不存在`);
+      for (const pr of cl.promote || []) {
+        if (!c.classes[pr.to]) errs.push(`職業 ${id} 的轉職目標 ${pr.to} 不存在`);
+        if (pr.item && !c.items[pr.item]) errs.push(`職業 ${id} 的轉職道具 ${pr.item} 不存在`);
+      }
+    }
     for (const [id, sk] of Object.entries(c.skills)) {
       if (!SRPG.rules || !SRPG.rules.SKILL_EFFECTS[sk.effect]) errs.push(`技能 ${id} 的效果 ${sk.effect} 不存在`);
     }
@@ -168,8 +174,9 @@
   function makeUnit(c, place, roster, uid) {
     const def = c.units[place.unit];
     if (!def) throw new Error('未知單位 ' + place.unit);
-    const cls = c.classes[def.class] || {};
     const saved = place.team === 'player' && roster ? roster[place.unit] : null;
+    const clsId = (saved && saved.cls) || place.cls || def.class;
+    const cls = c.classes[clsId] || {};
     const stats = clone(saved ? saved.stats : def.stats) || {};
     for (const k of STAT_KEYS) stats[k] = stats[k] || 0;
     const level = saved ? saved.level : (place.level || def.level || 1);
@@ -178,7 +185,7 @@
       : (def.items || []).map((id) => ({ id, uses: (c.items[id] && c.items[id].uses) || 1 }));
     return {
       uid, id: place.unit, name: def.name || place.unit, team: place.team || 'enemy',
-      cls: def.class, className: cls.name || def.class,
+      cls: clsId, className: cls.name || clsId,
       level, exp: saved ? saved.exp : 0,
       x: place.x, y: place.y, hp: stats.hp, stats,
       growth: clone(def.growth || cls.growth || {}),
@@ -186,6 +193,7 @@
       equip: 0,
       move: cls.move || 5, moveType: cls.moveType || 'foot', tags: clone(cls.tags || []),
       sprite: def.sprite || cls.sprite || null, portrait: def.portrait || null,
+      wup: clone((saved && saved.wup) || {}), upg: clone((saved && saved.upg) || {}),
       ai: place.ai || 'aggressive', boss: !!place.boss, lord: !!(def.lord || place.lord),
       items, spirits: clone(def.spirits || cls.spirits || []),
       skills: [...new Set([].concat(cls.skills || [], def.skills || [], (saved && saved.skills) || []))],
@@ -196,6 +204,14 @@
       morale: def.morale || rules.moraleStart, buffs: {}, dir: place.team === 'enemy' ? 1 : 2,
       acted: false, moved: false,
     };
+  }
+
+  /* 轉職：class.promote = [{ to, level?, item?, bonus:{hp,str,…,mp,st} }]
+     itemId 有值時只列出需要該道具（或不需道具）的路線 */
+  function promotionOptions(c, clsId, level, itemId) {
+    const cl = c.classes[clsId] || {};
+    return (cl.promote || []).filter((p) => c.classes[p.to] && (level || 1) >= (p.level || 1) &&
+      (itemId === undefined ? !p.item : (!p.item || p.item === itemId)));
   }
 
   function resolveNext(chapter, flags) {
@@ -221,6 +237,6 @@
     return neg ? !ok : ok;
   }
 
-  SRPG.campaign = { STAT_KEYS, STAT_NAMES, BASE_TERRAINS, BASE_SPIRITS, BASE_ITEMS, BASE_SKILLS, normalize, validate, parseMap, defaultLegend, makeUnit, resolveNext, testCond };
+  SRPG.campaign = { promotionOptions, STAT_KEYS, STAT_NAMES, BASE_TERRAINS, BASE_SPIRITS, BASE_ITEMS, BASE_SKILLS, normalize, validate, parseMap, defaultLegend, makeUnit, resolveNext, testCond };
   if (typeof module !== 'undefined' && module.exports) module.exports = SRPG;
 })(typeof window !== 'undefined' ? window : globalThis);

@@ -78,7 +78,11 @@
     ctx.beginPath(); ctx.ellipse(a.x, GROUND + 6, SIZE * 0.32, 12, 0, 0, Math.PI * 2); ctx.fill();
     ctx.translate(a.x, GROUND - SIZE + 10 + (a.dy || 0));
     if (!isImg && a.side === 'right') ctx.scale(-1, 1);
-    const fi = isImg ? [0, 1, 2, 1][Math.floor(t / 180) % 4] : Math.floor(t / 400) % Math.max(1, SP.frameCount(sp));
+    // 圖片角色沒有動作影格：攻擊時前傾、受擊時後仰
+    if (isImg && a.pose === 'attack') { ctx.translate(0, SIZE * 0.8); ctx.rotate((a.side === 'left' ? 1 : -1) * 0.18); ctx.translate(0, -SIZE * 0.8); }
+    if (isImg && a.hurtUntil > t) { ctx.translate(0, SIZE * 0.8); ctx.rotate((a.side === 'left' ? -1 : 1) * 0.15); ctx.translate(0, -SIZE * 0.8); }
+    const pose = a.hurtUntil > t ? 'hurt' : a.pose || 'idle';
+    const fi = isImg ? [0, 1, 2, 1][Math.floor(t / 180) % 4] : SP.pickFrame(sp, pose, t, pose === 'idle' ? 400 : 120);
     const dir = a.side === 'left' ? 2 : 1;
     if (a.flash > 0) ctx.filter = `brightness(${1 + a.flash * 2})`;
     const ok = sp && SP.draw(ctx, sp, isImg && !a.moving ? 1 : fi, a.u.team, -SIZE / 2, 0, SIZE, SIZE, dir);
@@ -244,7 +248,8 @@
           const dirSign = who.side === 'left' ? 1 : -1;
           const to = st.to === 'home' ? who.homeX : st.to === 'back' ? who.homeX - dirSign * 50 : other.x - dirSign * 120;
           who.moving = true;
-          tweens.push({ t0, ms: st.ms || 200, apply: (p) => { who.x = from + (to - from) * p; if (p >= 1) who.moving = false; } });
+          if (st.to === 'target' && who === me) who.pose = 'attack';
+          tweens.push({ t0, ms: st.ms || 200, apply: (p) => { who.x = from + (to - from) * p; if (p >= 1) { who.moving = false; if (st.to === 'home') who.pose = 'idle'; } } });
           break;
         }
         case 'particles': {
@@ -271,6 +276,7 @@
 
     function applyHit(me, tg, s, t0) {
       if (!s) return;
+      me.pose = 'attack';
       const p = posOf(tg, 'top');
       if (s.skills && s.skills.length) effects.push({ kind: 'popup', text: s.skills.join('・') + '！', color: '#9fd8ff', size: 26, x: posOf(me, 'top').x, y: 150, ms: 900, t0 });
       if (!s.hit) {
@@ -280,7 +286,7 @@
         if (SRPG.sound) SRPG.sound.play('miss');
         return;
       }
-      tg.hp = s.hpAfter; tg.flash = 1;
+      tg.hp = s.hpAfter; tg.flash = 1; tg.hurtUntil = t0 + 350;
       if (s.drain) me.hp = s.hpSelf != null ? s.hpSelf : me.hp + s.drain;
       effects.push({ kind: 'popup', text: (s.crit ? '必殺 ' : '') + s.dmg, color: s.crit ? '#ffd24a' : '#ff6464', size: s.crit ? 48 : 36, x: p.x, y: p.y - 40, ms: 800, t0 });
       if (s.drain) effects.push({ kind: 'popup', text: '+' + s.drain, color: '#5ae07a', x: posOf(me, 'top').x, y: p.y - 10, ms: 800, t0 });
@@ -303,7 +309,7 @@
       }
       if (!hitDone) begin({ type: 'hit' }, me, tg, s);
       await waitUntil(base + tl.total + 150);
-      me.x = me.homeX; tg.x = tg.homeX;
+      me.x = me.homeX; tg.x = tg.homeX; me.pose = 'idle'; tg.pose = 'idle';
     }
 
     const api = { stop() { alive = false; window.removeEventListener('keydown', onKey, true); if (own && wrap) wrap.remove(); } };
@@ -342,5 +348,49 @@
     ctx.restore();
   }
 
-  SRPG.scene = { play, drawBackground, W, H };
+  /* 地圖上的疊加演出（地圖兵器用）：只播放 cutin / text / flash / tint / shake / sound 步驟，背景透明 */
+  function overlay(opts) {
+    const c = opts.campaign, anim = opts.animDef || c.animations[opts.anim];
+    if (!anim) return Promise.resolve();
+    const wrap = document.createElement('div');
+    wrap.className = 'scene-wrap overlay';
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    wrap.appendChild(cv);
+    (opts.host || document.body).appendChild(wrap);
+    const ctx = cv.getContext('2d');
+    const tl = M.timeline(anim);
+    const speed = opts.speed || 1;
+    const ov = {};
+    const actor = { u: opts.unit, side: opts.unit.team === 'enemy' ? 'left' : 'right' };
+    const fmt = (t) => String(t || '').replace('{weapon}', opts.weaponName || '').replace('{name}', opts.unit.name);
+    const t0 = performance.now();
+    let fired = 0;
+    const total = Math.min(tl.total, 2500);
+    return new Promise((resolve) => {
+      const frame = (now) => {
+        const clock = (now - t0) * speed;
+        while (fired < tl.steps.length && tl.steps[fired].start <= clock) {
+          const st = tl.steps[fired++].step;
+          const s0 = tl.steps[fired - 1].start;
+          if (st.type === 'cutin') ov.cutin = { actor, text: fmt(st.text), color: st.color || '#ffd24a', ms: st.ms || 900, t0: s0 };
+          else if (st.type === 'text') ov.text = { text: fmt(st.text), color: st.color, size: st.size, ms: st.ms || 800, t0: s0 };
+          else if (st.type === 'flash') ov.flash = { color: st.color || '#fff', ms: st.ms || 150, t0: s0 };
+          else if (st.type === 'tint') ov.tint = { color: st.color, ms: st.ms || 800, t0: s0 };
+          else if (st.type === 'shake') { const host = document.getElementById('stage'); if (host) { host.classList.add('shake'); setTimeout(() => host.classList.remove('shake'), st.ms || 250); } }
+          else if (st.type === 'sound' && SRPG.sound) SRPG.sound.play(st.id);
+        }
+        ctx.clearRect(0, 0, W, H);
+        const live = (o) => o && clock - o.t0 < o.ms;
+        if (live(ov.tint)) { ctx.globalAlpha = 0.8; ctx.fillStyle = ov.tint.color; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+        if (live(ov.cutin)) drawCutin(ctx, c, ov.cutin, clock);
+        if (live(ov.text)) { ctx.font = `bold ${ov.text.size || 44}px sans-serif`; ctx.textAlign = 'center'; ctx.lineWidth = 8; ctx.strokeStyle = '#000'; ctx.strokeText(ov.text.text, W / 2, H / 2); ctx.fillStyle = ov.text.color || '#fff'; ctx.fillText(ov.text.text, W / 2, H / 2); }
+        if (live(ov.flash)) { ctx.globalAlpha = 1 - (clock - ov.flash.t0) / ov.flash.ms; ctx.fillStyle = ov.flash.color; ctx.fillRect(0, 0, W, H); ctx.globalAlpha = 1; }
+        if (clock >= total + 100) { wrap.remove(); resolve(); } else requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+    });
+  }
+
+  SRPG.scene = { play, overlay, drawBackground, W, H };
 })();

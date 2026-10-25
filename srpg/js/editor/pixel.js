@@ -212,7 +212,8 @@
     function refreshFrames() {
       framesEl.innerHTML = '';
       sp.frames.forEach((fr, i) => {
-        const c = h('canvas.px.f', { width: 40, height: 40, className: 'px f' + (i === st.frame ? ' on' : ''), title: '影格 ' + (i + 1), onclick: () => { st.frame = i; ED.render(); } });
+        const pz = poseOf(sp, i);
+        const c = h('canvas.px.f', { width: 40, height: 40, className: 'px f' + (i === st.frame ? ' on' : ''), title: '影格 ' + (i + 1) + '（' + { idle: '待機', attack: '攻擊', hurt: '受擊' }[pz] + '）', style: pz === 'idle' ? '' : `outline:2px solid ${pz === 'attack' ? '#ff9a3a' : '#ff5a8a'}`, onclick: () => { st.frame = i; ED.render(); } });
         c.getContext('2d').imageSmoothingEnabled = false;
         c.getContext('2d').drawImage(SP.gridToCanvas(sp, fr, st.previewTeam), 0, 0, 40, 40);
         framesEl.append(c);
@@ -239,12 +240,15 @@
           h('span.hint', {}, '右鍵＝擦除')),
         cv,
         h('h3', {}, '影格'), framesEl,
+        h('div.row', {}, `第 ${st.frame + 1} 格的動作：`,
+          ...[['idle', '待機'], ['attack', '攻擊'], ['hurt', '受擊']].map(([k, l]) => h('button', { className: poseOf(sp, st.frame) === k ? 'on' : '', onclick: () => { setPose(sp, st.frame, k); ED.dirty(true); } }, l)),
+          h('span.hint', {}, '地圖上循環播放「待機」影格；戰鬥演出衝向對方時用「攻擊」、被打中時用「受擊」')),
         h('div.row', {},
           h('button', { onclick: () => { sp.frames.push(blank(sp.w, sp.h)); st.frame = sp.frames.length - 1; SP.invalidate(sp); ED.dirty(true); } }, '＋ 空白影格'),
-          h('button', { onclick: () => { sp.frames.splice(st.frame + 1, 0, sp.frames[st.frame].slice()); st.frame++; SP.invalidate(sp); ED.dirty(true); } }, '⧉ 複製影格'),
+          h('button', { onclick: () => { sp.frames.splice(st.frame + 1, 0, sp.frames[st.frame].slice()); shiftPoses(sp, st.frame + 1, 1); st.frame++; SP.invalidate(sp); ED.dirty(true); } }, '⧉ 複製影格'),
           h('button', { onclick: () => { sp.frames[st.frame] = sp.frames[st.frame].map((r) => r.split('').reverse().join('')); SP.invalidate(sp); ED.dirty(true); } }, '⇋ 左右翻轉'),
           h('button', { onclick: () => { const r = sp.frames[st.frame]; r.unshift(r.pop()); SP.invalidate(sp); ED.dirty(true); } }, '↓ 下移 1px'),
-          h('button.danger', { disabled: sp.frames.length < 2, onclick: () => { sp.frames.splice(st.frame, 1); st.frame = Math.max(0, st.frame - 1); SP.invalidate(sp); ED.dirty(true); } }, '🗑 刪除影格'))),
+          h('button.danger', { disabled: sp.frames.length < 2, onclick: () => { sp.frames.splice(st.frame, 1); shiftPoses(sp, st.frame, -1); st.frame = Math.max(0, st.frame - 1); SP.invalidate(sp); ED.dirty(true); } }, '🗑 刪除影格'))),
       h('div', {},
         h('h2', {}, '預覽'), prev,
         h('div.row', {}, '隊伍色', ED.select(st, 'previewTeam', [['player', '我方'], ['enemy', '敵方'], ['ally', '友軍']], { rerender: true })),
@@ -265,6 +269,29 @@
         h('button', { onclick: () => importPng(sp).catch((e) => ED.toast('匯入失敗：' + e.message)) }, '📥 匯入 PNG/JPG'),
         h('p.hint', {}, '會縮放到目前尺寸、以四角顏色去背、自動減色加入調色盤。')));
   };
+
+  /* 動作標記：sp.poses = { attack:[i], hurt:[i] }（idle 為其餘影格） */
+  function poseOf(sp, i) {
+    const P = sp.poses || {};
+    if ((P.attack || []).includes(i)) return 'attack';
+    if ((P.hurt || []).includes(i)) return 'hurt';
+    return 'idle';
+  }
+  function setPose(sp, i, pose) {
+    const P = sp.poses = sp.poses || {};
+    for (const k of ['attack', 'hurt']) { P[k] = (P[k] || []).filter((x) => x !== i); if (!P[k].length) delete P[k]; }
+    delete P.idle;
+    if (pose !== 'idle') (P[pose] = P[pose] || []).push(i);
+    if (!Object.keys(P).length) delete sp.poses;
+  }
+  // 插入/刪除影格時同步調整動作標記
+  function shiftPoses(sp, at, d) {
+    if (!sp.poses) return;
+    for (const k of Object.keys(sp.poses)) {
+      sp.poses[k] = sp.poses[k].filter((i) => !(d < 0 && i === at)).map((i) => (i >= at ? i + d : i));
+      if (!sp.poses[k].length) delete sp.poses[k];
+    }
+  }
 
   function editColor(sp, ch) {
     const val = sp.palette[ch];

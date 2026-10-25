@@ -158,3 +158,6 @@ button { font-family: inherit; }
 #zoomCtl { display: flex; gap: 4px; }
 #zoomCtl .btn { padding: 4px 9px; }
 #map.zoomed { max-width: none; }
+.scene-wrap.overlay { background: transparent; pointer-events: none; }
+#stage.shake { animation: stageShake 0.08s linear infinite; }
+@keyframes stageShake { 0% { transform: translate(4px, 2px); } 50% { transform: translate(-4px, -2px); } 100% { transform: translate(2px, -3px); } }
