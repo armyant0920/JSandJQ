@@ -67,6 +67,7 @@
     c.spirits = Object.assign({}, clone(BASE_SPIRITS), c.spirits || {});
     c.items = Object.assign({}, clone(BASE_ITEMS), c.items || {});
     c.skills = Object.assign({}, clone(BASE_SKILLS), c.skills || {});
+    c.abilities = Object.assign({}, clone((SRPG.ability && SRPG.ability.BASE_ABILITIES) || {}), c.abilities || {});
     c.supports = c.supports || {};
     if (SRPG.media) {
       c.sounds = Object.assign({}, clone(SRPG.media.BASE_SOUNDS), c.sounds || {});
@@ -90,9 +91,13 @@
       for (const it of u.items || []) if (!c.items[it]) errs.push(`角色 ${id} 的道具 ${it} 不存在`);
       for (const sp of u.spirits || []) if (!c.spirits[sp]) errs.push(`角色 ${id} 的精神指令 ${sp} 不存在`);
       for (const sk of u.skills || []) if (!c.skills[sk]) errs.push(`角色 ${id} 的技能 ${sk} 不存在`);
+      for (const ab of u.abilities || []) if (!c.abilities[ab]) errs.push(`角色 ${id} 的主動技能 ${ab} 不存在`);
+      for (const l of u.learn || []) if (!c.abilities[l.ability]) errs.push(`角色 ${id} 的習得技能 ${l.ability} 不存在`);
     }
     for (const [id, cl] of Object.entries(c.classes)) {
       for (const sk of cl.skills || []) if (!c.skills[sk]) errs.push(`職業 ${id} 的技能 ${sk} 不存在`);
+      for (const ab of cl.abilities || []) if (!c.abilities[ab]) errs.push(`職業 ${id} 的主動技能 ${ab} 不存在`);
+      for (const l of cl.learn || []) if (!c.abilities[l.ability]) errs.push(`職業 ${id} 的習得技能 ${l.ability} 不存在`);
       for (const pr of cl.promote || []) {
         if (!c.classes[pr.to]) errs.push(`職業 ${id} 的轉職目標 ${pr.to} 不存在`);
         if (pr.item && !c.items[pr.item]) errs.push(`職業 ${id} 的轉職道具 ${pr.item} 不存在`);
@@ -207,6 +212,9 @@
       ...(place.trigger ? { trigger: place.trigger } : {}), ...(place.escape ? { escape: clone(place.escape) } : {}), lord: !!(def.lord || place.lord),
       items, spirits: clone(def.spirits || cls.spirits || []),
       skills: [...new Set([].concat(cls.skills || [], def.skills || [], (saved && saved.skills) || []))],
+      abilities: [...new Set([].concat(cls.abilities || [], def.abilities || [], (saved && saved.abilities) || [],
+        [].concat(cls.learn || [], def.learn || []).filter((l) => (l.level || 1) <= level).map((l) => l.ability))
+        .filter((id) => c.abilities && c.abilities[id]))],
       sp: def.sp || 0, maxSp: def.sp || 0,
       mp: def.mp != null ? def.mp : (cls.mp || 0), maxMp: def.mp != null ? def.mp : (cls.mp || 0),
       st: def.st != null ? def.st : (cls.st || 0), maxSt: def.st != null ? def.st : (cls.st || 0),

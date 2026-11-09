@@ -38,6 +38,14 @@
     }));
   }
 
+  // 依等級學會的主動技能：[{ level, ability }]
+  function learnList(obj) {
+    obj.learn = obj.learn || [];
+    const rows = obj.learn.map((l, i) => h('div.row', {}, 'Lv', ED.num(l, 'level', { attrs: { style: 'width:52px' } }), '學會', ED.select(l, 'ability', ED.named('abilities')),
+      h('button.danger', { onclick: () => { obj.learn.splice(i, 1); if (!obj.learn.length) delete obj.learn; ED.dirty(true); } }, '✕')));
+    return h('div', {}, ...rows, h('button', { onclick: () => { obj.learn.push({ level: 5, ability: Object.keys(ED.c.abilities)[0] }); ED.dirty(true); } }, '＋ 等級習得'));
+  }
+
   function spritePreview(spId, team, size) {
     const cv = h('canvas.px', { width: size || 64, height: size || 64 });
     const sp = spId && (ED.c.sprites[spId] || ED.c.portraits[spId]);
@@ -116,7 +124,9 @@
         ...ED.formRow('精神指令', idList(u, 'spirits', 'spirits', false)),
         ...ED.formRow('體力 / 法力', '體力', ED.num(u, 'st', { attrs: { placeholder: '職業值' } }), '法力', ED.num(u, 'mp', { attrs: { placeholder: '職業值' } }), h('span.hint', {}, '資源系統開啟時使用')),
         ...ED.formRow('視野', ED.num(u, 'vision', { attrs: { placeholder: '職業值' } }), h('span.hint', {}, '霧戰時看得到的距離')),
-        ...ED.formRow('技能', idList(u, 'skills', 'skills', false), h('span.hint', {}, '另外會繼承職業技能'))),
+        ...ED.formRow('技能', idList(u, 'skills', 'skills', false), h('span.hint', {}, '另外會繼承職業技能')),
+        ...ED.formRow('主動技能', idList(u, 'abilities', 'abilities', false), h('span.hint', {}, '另外會繼承職業的主動技能')),
+        ...ED.formRow('等級習得', learnList(u))),
       h('h3', {}, '基礎能力'), stats(u.stats),
       h('h3', {}, '成長率 %（每升一級各項提升的機率）'), stats(u.growth)));
   };
@@ -139,7 +149,9 @@
         ...ED.formRow('標籤', h('input', { type: 'text', value: (c.tags || []).join(','), placeholder: 'fly,armor,horse（特效武器用）', onchange: (e) => { c.tags = e.target.value.split(',').map((s) => s.trim()).filter(Boolean); ED.dirty(); } })),
         ...ED.formRow('體力 / 法力', '體力', ED.num(c, 'st'), '法力', ED.num(c, 'mp'), h('span.hint', {}, '此職業角色的預設值')),
         ...ED.formRow('視野', ED.num(c, 'vision', { attrs: { placeholder: '3' } })),
-        ...ED.formRow('職業技能', idList(c, 'skills', 'skills', false))),
+        ...ED.formRow('職業技能', idList(c, 'skills', 'skills', false)),
+        ...ED.formRow('主動技能', idList(c, 'abilities', 'abilities', false)),
+        ...ED.formRow('等級習得', learnList(c), h('span.hint', {}, '此職業的角色升到指定等級時學會'))),
       h('h3', {}, '轉職路線'),
       ...(c.promote || []).map((p, i) => h('div.card', {},
         h('div.row', {}, '轉職為', ED.select(p, 'to', ED.named('classes')), '需要等級', ED.num(p, 'level', { attrs: { placeholder: '1' } }),
@@ -252,6 +264,84 @@
         ...rows.flat(),
         ...ED.formRow('說明', ED.text(sk, 'desc', { optional: true }))),
       h('p.hint', {}, '再移動：行動後可用剩餘移動力移動｜先制：HP ≤ 數值% 時被攻擊先出手｜追擊：追擊門檻降低｜連續/太陽/月光：依發動率觸發｜能力加成：命中/迴避/必殺/傷害/減傷。技能可設在職業（全職業共有）或角色身上，劇本指令「學會技能」可在劇情中習得。')));
+  };
+
+  /* ---------- 主動技能 ---------- */
+  const AB_TARGETS = [['enemy', '敵人'], ['ally', '同伴（含自己）'], ['any', '所有人（會誤傷）'], ['self', '只有自己']];
+  const FX_NAMES = { slash: '斬擊', fire: '火焰', ice: '冰', thunder: '雷', wind: '風', earth: '大地', holy: '神聖', dark: '暗黑', poison: '毒', heal: '回復', buff: '強化' };
+  const EFFECT_TYPES = [['status', '狀態異常/狀態'], ['stat', '能力增減'], ['push', '擊退'], ['drain', '吸收傷害'], ['cure', '淨化']];
+  const STAT_OPTS = [['str', '力量'], ['mag', '魔力'], ['skl', '技巧'], ['spd', '速度'], ['lck', '幸運'], ['def', '守備'], ['res', '魔防'], ['hit', '命中'], ['avo', '迴避'], ['crit', '必殺'], ['move', '移動']];
+  const effType = (e) => (e.status ? 'status' : e.stat ? 'stat' : e.push ? 'push' : e.drain ? 'drain' : 'cure');
+
+  // 範圍預覽：施放者在中央下方，藍＝施放距離，橘/綠＝作用範圍
+  function areaPreview(ab) {
+    const N = 11, S = 18, me = { x: 5, y: 7 };
+    const cv = h('canvas.px', { width: N * S, height: N * S });
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#1a2030'; ctx.fillRect(0, 0, N * S, N * S);
+    const A = SRPG.ability;
+    const shape = (ab.area || {}).shape || 'single';
+    const [lo, hi] = ab.range || [1, 1];
+    if (!A.DIRECTIONAL[shape] && ab.target !== 'self' && shape !== 'all') {
+      ctx.fillStyle = 'rgba(80,140,255,0.35)';
+      for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) { const d = Math.abs(x - me.x) + Math.abs(y - me.y); if (d >= lo && d <= hi) ctx.fillRect(x * S, y * S, S, S); }
+    }
+    const at = ab.target === 'self' || shape === 'all' ? me : A.DIRECTIONAL[shape] ? { x: me.x, y: me.y - 1 } : { x: me.x, y: me.y - Math.max(lo, Math.min(hi, 2)) };
+    ctx.fillStyle = ab.target === 'ally' || ab.target === 'self' ? 'rgba(90,230,140,0.75)' : 'rgba(255,140,40,0.8)';
+    for (const p of A.shapeTiles(ab, me, at, N, N)) ctx.fillRect(p.x * S + 1, p.y * S + 1, S - 2, S - 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    for (let i = 0; i <= N; i++) { ctx.beginPath(); ctx.moveTo(i * S, 0); ctx.lineTo(i * S, N * S); ctx.stroke(); ctx.beginPath(); ctx.moveTo(0, i * S); ctx.lineTo(N * S, i * S); ctx.stroke(); }
+    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(me.x * S + S / 2, me.y * S + S / 2, S / 3, 0, Math.PI * 2); ctx.fill();
+    return cv;
+  }
+
+  ED.tabs.abilities = function () {
+    const id = ED.sel.abilities = ED.sel.abilities && ED.c.abilities[ED.sel.abilities] ? ED.sel.abilities : Object.keys(ED.c.abilities)[0];
+    const left = ED.listPanel('abilities', { prefix: 'ability', make: () => ({ name: '新技能', target: 'enemy', range: [1, 2], area: { shape: 'burst', size: 1 }, power: 4, dmg: 'mag', hit: 85, cost: 4, fx: 'fire', color: '#ff8a3a' }) });
+    if (!id) return h('div.split', {}, left, h('p.hint', {}, '尚無主動技能'));
+    const ab = ED.c.abilities[id];
+    ab.area = ab.area || { shape: 'single' };
+    ab.range = ab.range || [1, 1];
+    const shape = ab.area.shape || 'single';
+    const rgIn = (i) => h('input', { type: 'number', value: ab.range[i], min: 0, max: 20, style: 'width:56px', onchange: (e) => { ab.range[i] = +e.target.value; ED.dirty(true); } });
+    ab.effects = ab.effects || [];
+    const effRows = ab.effects.map((e, i) => {
+      const t = effType(e);
+      const setType = (nt) => { const ne = nt === 'status' ? { status: 'poison', chance: 100, turns: 2 } : nt === 'stat' ? { stat: 'str', value: 2, turns: 2 } : nt === 'push' ? { push: 1 } : nt === 'drain' ? { drain: 50 } : { cure: true }; ab.effects[i] = ne; ED.dirty(true); };
+      const params = t === 'status' ? [ED.select(e, 'status', Object.entries(SRPG.rules.STATUSES).map(([k, s]) => [k, s.name])), '機率%', ED.num(e, 'chance', { attrs: { style: 'width:60px', placeholder: '100' } }), '回合', ED.num(e, 'turns', { attrs: { style: 'width:52px', placeholder: '1' } })]
+        : t === 'stat' ? [ED.select(e, 'stat', STAT_OPTS), '增減', ED.num(e, 'value', { attrs: { style: 'width:60px' } }), '回合', ED.num(e, 'turns', { attrs: { style: 'width:52px', placeholder: '2' } })]
+        : t === 'push' ? ['格數', ED.num(e, 'push', { attrs: { style: 'width:52px' } })]
+        : t === 'drain' ? ['吸收 %', ED.num(e, 'drain', { attrs: { style: 'width:60px' } })] : [h('span.hint', {}, '解除異常狀態與減益')];
+      return h('div.row', {}, h('select', { onchange: (ev) => setType(ev.target.value) }, ...EFFECT_TYPES.map(([k, n]) => h('option', { value: k, selected: k === t }, n))), ...params,
+        h('button.danger', { onclick: () => { ab.effects.splice(i, 1); ED.dirty(true); } }, '✕'));
+    });
+    const users = Object.entries(ED.c.units).filter(([, u]) => (u.abilities || []).includes(id) || (u.learn || []).some((l) => l.ability === id)).map(([k, u]) => u.name || k)
+      .concat(Object.entries(ED.c.classes).filter(([, c]) => (c.abilities || []).includes(id) || (c.learn || []).some((l) => l.ability === id)).map(([k, c]) => '職業 ' + (c.name || k)));
+    return h('div.split', {}, left, h('div', {},
+      h('h2', {}, '主動技能：' + (ab.name || id)),
+      h('div.row', { style: { alignItems: 'flex-start', gap: '16px' } },
+        h('div.form', { style: { flex: 1 } },
+          ...ED.formRow('ID', ED.idField('abilities')),
+          ...ED.formRow('名稱', ED.text(ab, 'name')),
+          ...ED.formRow('說明', ED.text(ab, 'desc', { optional: true })),
+          ...ED.formRow('對象', ED.select(ab, 'target', AB_TARGETS, { rerender: true })),
+          ...ED.formRow('施放距離', rgIn(0), '～', rgIn(1), h('span.hint', {}, '0～0 = 以自己為中心；直線/扇形固定從自己出發')),
+          ...ED.formRow('範圍形狀', ED.select(ab.area, 'shape', Object.entries(SRPG.ability.SHAPES), { rerender: true }),
+            shape !== 'single' && shape !== 'all' ? ['大小', ED.num(ab.area, 'size', { rerender: true, attrs: { style: 'width:52px', placeholder: '1' } })] : [],
+            ['burst', 'square', 'cross'].includes(shape) ? h('label', {}, h('input', { type: 'checkbox', checked: !!ab.area.hollow, onchange: (e) => { if (e.target.checked) ab.area.hollow = true; else delete ab.area.hollow; ED.dirty(true); } }), ' 不含中心') : null),
+          ...ED.formRow('傷害', '威力', ED.num(ab, 'power', { attrs: { style: 'width:60px', placeholder: '0 = 無' } }), ED.select(ab, 'dmg', [['phys', '物理（力量 vs 守備）'], ['mag', '魔法（魔力 vs 魔防）']]),
+            '命中', ED.num(ab, 'hit', { attrs: { style: 'width:60px', placeholder: '90' } }), '必殺', ED.num(ab, 'crit', { attrs: { style: 'width:52px', placeholder: '0' } })),
+          ...ED.formRow('回復', ED.num(ab, 'heal', { attrs: { placeholder: '0 = 無' } }), h('span.hint', {}, '實際回復 = 回復量 + 魔力/2')),
+          ...ED.formRow('消耗', ED.num(ab, 'cost', { attrs: { placeholder: '0' } }), ED.select(ab, 'costType', [['st', '體力'], ['mp', '法力']], { optional: true, optionalLabel: '（自動：物理用體力、其他用法力）' }),
+            '冷卻', ED.num(ab, 'cooldown', { attrs: { style: 'width:52px', placeholder: '0' } }), '回合', '氣力', ED.num(ab, 'morale', { attrs: { style: 'width:60px', placeholder: '無' } })),
+          ...ED.formRow('特效', ED.select(ab, 'fx', Object.entries(FX_NAMES)), h('input', { type: 'color', value: ab.color || '#ffffff', onchange: (e) => { ab.color = e.target.value; ED.dirty(); } }),
+            '演出', ED.select(ab, 'anim', ED.named('animations'), { optional: true, optionalLabel: '（不播放，只顯示地圖特效）' })),
+          ...ED.formRow('圖示', h('span', {}, ab.icon != null ? iconCell(ab.icon) : '—'), ED.num(ab, 'icon', { attrs: { style: 'width:70px', placeholder: '編號' } }))),
+        h('div', {}, areaPreview(ab), h('p.hint', {}, '白點＝施放者　藍＝可施放位置', h('br'), '橘/綠＝作用範圍'))),
+      h('h3', {}, '附加效果（命中時）'), ...effRows,
+      h('button', { onclick: () => { ab.effects.push({ status: 'poison', chance: 100, turns: 2 }); ED.dirty(true); } }, '＋ 新增效果'),
+      h('p.hint', {}, '使用者：' + (users.join('、') || '（尚無，在角色或職業頁加入）')),
+      h('p.hint', {}, '技能不會被反擊。狀態：中毒（每回合 -10% HP，不致死）、睡眠（無法行動與反擊，受傷醒來）、暈眩（無法行動與反擊）、緩速（移動 -2）、沉默（不能用主動技能）、再生（每回合 +10% HP）。敵將的負面狀態機率減半。')));
   };
 
   /* ---------- 支援 ---------- */

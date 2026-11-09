@@ -142,9 +142,22 @@
   /* ---------- 資訊卡 ---------- */
   function statsHtml(u, ups) {
     const N = SRPG.campaign.STAT_NAMES;
-    return '<div class="stats">' + SRPG.campaign.STAT_KEYS.filter((k) => k !== 'hp').map((k) =>
-      `<span class="${ups && ups[k] ? 'up' : ''}"><b>${N[k]}</b>${u.stats[k]}${ups && ups[k] ? '+' + ups[k] : ''}</span>`).join('') + '</div>';
+    const mod = (k) => (u.mods || []).reduce((a, m) => a + (m.stat === k ? m.value : 0), 0);
+    return '<div class="stats">' + SRPG.campaign.STAT_KEYS.filter((k) => k !== 'hp').map((k) => {
+      const m = ups ? 0 : mod(k);
+      return `<span class="${ups && ups[k] ? 'up' : ''}${m > 0 ? ' modup' : m < 0 ? ' moddn' : ''}"><b>${N[k]}</b>${u.stats[k] + m}${ups && ups[k] ? '+' + ups[k] : ''}</span>`;
+    }).join('') + '</div>';
   }
+
+  // 主動技能說明（選單備註與卡片共用）
+  UI.abilityNote = function (b, ab) {
+    const A = SRPG.ability, rules = SRPG.rules.rulesOf(b);
+    const c = A.costOf(ab);
+    const rg = ab.target === 'self' || (ab.area || {}).shape === 'all' || A.DIRECTIONAL[(ab.area || {}).shape] ? ''
+      : (ab.range || [1, 1])[1] === 0 ? '自身周圍 ' : '射' + (ab.range || [1, 1]).join('-') + ' ';
+    const shape = A.SHAPES[(ab.area || {}).shape || 'single'] + ((ab.area || {}).size > 1 && (ab.area || {}).shape !== 'single' ? (ab.area || {}).size : '');
+    return rg + shape + (ab.power ? ' 威' + ab.power : '') + (ab.heal ? ' 回' + ab.heal : '') + (c && rules.resources ? ' ' + (c.type === 'mp' ? 'MP' : '體') + c.n : '') + (ab.cooldown ? ' 冷' + ab.cooldown : '');
+  };
 
   const icon = (i, sz) => (i != null ? `<span style="${SRPG.sprites.iconStyle(i, sz || 16)}"></span>` : '');
   UI.icon = icon;
@@ -160,7 +173,10 @@
       return `<div class="${i === u.equip ? 'eq' : ''}${usable ? '' : ' dim'}">${icon(w.icon)} ${esc(w.name || id)} <small>${R.isStaff(w) ? '回復' + (w.heal || 10) : '威' + (w.mt || 0) + ' 命' + (w.hit || 0)} 射${(w.range || [1, 1]).join('-')}${w.brave ? ' 勇' : ''}${w.morale ? ' 氣' + w.morale : ''}${w.map ? ' 地圖' : ''}${w.cost && rules.resources ? ' ' + (R.weaponCost(w).type === 'mp' ? 'MP' : '體') + w.cost : ''}</small></div>`;
     }).join('');
     const il = (u.items || []).map((it) => { const d = b.campaign.items[it.id] || {}; return `<div>${icon(d.icon)} ${esc(d.name || it.id)} <small>×${it.uses}</small></div>`; }).join('');
-    const bf = Object.keys(u.buffs || {}).map((k) => (R.EFFECTS[k] || {}).name || k);
+    const bf = Object.keys(u.buffs || {}).map((k) => (R.EFFECTS[k] || {}).name || k)
+      .concat(Object.entries(u.status || {}).map(([k, n]) => ((R.STATUSES[k] || {}).name || k) + ' ' + n))
+      .concat((u.mods || []).map((m) => SRPG.ability.statLabel(m.stat) + (m.value > 0 ? '+' : '') + m.value + ' (' + m.turns + ')'));
+    const abl = SRPG.ability ? SRPG.ability.listFor(b, u) : [];
     const sk = R.skillsOf(b, u);
     const bar = (label, v, m, col) => `<div>${label} ${v}/${m}<div class="bar"><i style="width:${m ? v / m * 100 : 0}%;background:${col}"></i></div></div>`;
     const res = rules.resources && (u.maxSt || u.maxMp) ? `<div class="res">${u.maxSt ? bar('體力', u.st, u.maxSt, '#ffb44a') : '<div></div>'}${u.maxMp ? bar('法力', u.mp, u.maxMp, '#6aa8ff') : ''}</div>` : '';
@@ -173,6 +189,7 @@
       ${bf.length ? `<div class="buffs">${bf.map((x) => `<span>${esc(x)}</span>`).join('')}</div>` : ''}
       ${res}${sk.length ? `<div class="skills">${sk.map((x) => `<span title="${esc(x.desc || '')}">${esc(x.name)}</span>`).join('')}</div>` : ''}
       ${u.carrying ? `<div>🫂 搬運中：${esc((b.units.find((o) => o.uid === u.carrying) || {}).name || '')}（技巧/速度減半）</div>` : ''}
+      ${abl.length ? `<div class="abil">${abl.map((ab) => `<div class="${ab.blocked ? 'dim' : ''}" title="${esc(ab.desc || '')}">✦ ${esc(ab.name)} <small>${esc(UI.abilityNote(b, ab))}${ab.blocked && ab.blocked !== '沒有目標' ? ' · ' + esc(ab.blocked) : ''}</small></div>`).join('')}</div>` : ''}
       <div class="inv">${wl}${il}</div>
       ${statsHtml(u)}`;
   };

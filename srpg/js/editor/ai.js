@@ -6,14 +6,14 @@
   'use strict';
   const { h } = ED;
   const C = SRPG.campaign;
-  const GROUPS = ['meta', 'terrains', 'weapons', 'items', 'skills', 'spirits', 'classes', 'units', 'supports', 'sprites', 'portraits', 'animations', 'sounds', 'scenes', 'chapters', 'scripts'];
+  const GROUPS = ['meta', 'terrains', 'weapons', 'items', 'skills', 'abilities', 'spirits', 'classes', 'units', 'supports', 'sprites', 'portraits', 'animations', 'sounds', 'scenes', 'chapters', 'scripts'];
 
   const SCOPES = {
     sprites: { label: '🎨 精靈圖 / 頭像（像素畫）', groups: ['sprites', 'portraits'], ctx: ['classes'] },
     maps: { label: '🗺 地圖與章節', groups: ['chapters'], ctx: ['terrains', 'units', 'scripts'] },
     story: { label: '📜 劇情對話', groups: ['scripts', 'chapters'], ctx: ['units'] },
     media: { label: '🎬 戰鬥演出 / 🔊 音效與 BGM', groups: ['animations', 'sounds', 'scenes'], ctx: ['weapons'] },
-    db: { label: '⚖ 角色 / 職業 / 武器 / 道具 / 精神指令', groups: ['units', 'classes', 'weapons', 'items', 'skills', 'spirits', 'supports'], ctx: ['sprites'] },
+    db: { label: '⚖ 角色 / 職業 / 武器 / 道具 / 技能 / 精神指令', groups: ['units', 'classes', 'weapons', 'items', 'skills', 'abilities', 'spirits', 'supports'], ctx: ['sprites'] },
   };
   const TASKS = {
     sprites: '請新增一個 16×16 的單位精靈 `sprite_xxx`：（描述外觀，例如：戴兜帽、拿法杖的白魔道士）。衣服主色用隊伍色 T/t。',
@@ -55,7 +55,8 @@
 - \`meta.rules\`：{ morale:true(氣力系統), spirits:true(精神指令), resources:true(體力/法力), stRegen, mpRegen, restSt }
 - \`weapons\` 另有：cost(消耗量)、costType:"st"|"mp"(預設物理用體力、魔法與杖用法力)、map:{shape:"burst"|"line", size, friendly?}(地圖兵器)、price
 - \`skills\` 被動技能：{ name, effect, desc, ...參數 }；effect：${Object.entries(SRPG.rules.SKILL_EFFECTS).map(([k, e]) => k + '(' + e.name + (e.params.length ? ':' + e.params.join('/') : '') + ')').join('、')}；rate 可為數字或能力名（spd/skl/lck…）
-- \`classes\`/\`units\` 另有：skills:[技能id]、st、mp、vision(霧戰視野)
+- \`classes\`/\`units\` 另有：skills:[被動技能id]、abilities:[主動技能id]、learn:[{level, ability}](升級學會)、st、mp、vision(霧戰視野)
+- \`abilities\` 主動技能（有範圍的招式/魔法，不會被反擊）：{ name, desc, target:"enemy|ally|any|self", range:[最小,最大]([0,0]=以自己為中心), area:{ shape:"single|burst|square|cross|line|cone|all", size, hollow? }, power?(威力), dmg:"phys|mag", hit?, crit?, heal?(回復量+魔力/2), effects?:[ {status:"poison|sleep|stun|slow|silence|regen", chance, turns} | {stat:"str|mag|skl|spd|lck|def|res|hit|avo|crit|move", value, turns} | {push:格數} | {drain:%} | {cure:true} ], cost?, costType?:"st|mp", cooldown?, morale?, fx:"slash|fire|ice|thunder|wind|earth|holy|dark|poison|heal|buff", color:"#rrggbb", anim?(演出id) }；line/cone 從施放者朝相鄰方向延伸
 - \`classes\` 另有 promote:[{ to:職業id, level:10, item?:轉職道具id, bonus:{hp,str,…,mp,st}, weapons?:[武器id] }]（轉職路線）；道具 kind:"promote" 為轉職道具
 - \`weapons\` 另有 upMt / upHit（每級改造的威力與命中加成，預設 1 / 3）；\`meta.rules.upgrades\`:true 開啟改造
 - 神奇傳說要素（\`meta.rules\`）：facing:true(單位朝向；側擊 sideHit、背擊 backHit/backCrit/backDmg)、charge:true(突進：直線移動 chargeMin 格後攻擊正前方，chargeDmg/chargeHit；武器 charge:true 或技能 effect "charge")、height:true(高低差：heightHit/heightDmg 每層、heightMax、heightClimb 爬坡上限)、rewind:3(每章回溯次數，-1 無限)；技能 effect "vigilant" 不會被側擊/背擊

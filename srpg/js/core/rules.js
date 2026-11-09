@@ -109,7 +109,26 @@
     return c == null ? Infinity : c;
   }
 
-  function moveOf(u) { return u.move + (buffs(u).accel || 0); }
+  function moveOf(u) { return Math.max(1, u.move + (buffs(u).accel || 0) + statOf(u, 'move')); }
+
+  /* ---------- 能力修正（增益/減益）與狀態異常 ----------
+     u.mods = [{ stat, value, turns }]：stat 為能力值或 hit/avo/crit/move
+     u.status = { poison: 剩餘回合, sleep, stun, slow, silence, regen } */
+  const STATUSES = {
+    poison:  { name: '中毒', short: '毒', color: '#9be15a', bad: true },   // 回合開始失去 10% HP（不會致死）
+    sleep:   { name: '睡眠', short: '眠', color: '#9fb4ff', bad: true },   // 無法行動與反擊、迴避 0；受到傷害就醒來
+    stun:    { name: '暈眩', short: '暈', color: '#ffd24a', bad: true },   // 無法行動與反擊、迴避 0
+    slow:    { name: '緩速', short: '緩', color: '#7ad7ff', bad: true },   // 移動力 -2
+    silence: { name: '沉默', short: '默', color: '#c7a0ff', bad: true },   // 不能使用主動技能
+    regen:   { name: '再生', short: '生', color: '#5ae07a', bad: false },  // 回合開始回復 10% HP
+  };
+  function statOf(u, k) {
+    let v = (u.stats && u.stats[k]) || 0;
+    for (const m of u.mods || []) if (m.stat === k) v += m.value || 0;
+    if (k === 'move' && u.status && u.status.slow) v -= 2;
+    return k === 'hit' || k === 'avo' || k === 'crit' || k === 'move' ? v : Math.max(0, v);
+  }
+  const disabled = (u) => !!(u.status && (u.status.sleep || u.status.stun));
 
   function unitAt(b, x, y) {
     return b.units.find((u) => onMap(u) && u.x === x && u.y === y) || null;
@@ -252,13 +271,14 @@
     const ow = weaponOf(b, other);
     const d = dist(myPos, otherPos);
     if (opts.weapon ? !usable(b, me, w) : !canAttackWith(b, me, w)) return null;
+    if (disabled(me)) return null;   // 睡眠/暈眩：不能攻擊也不能反擊
     if (!opts.ignoreRange && !canHitAt(w, d)) return null;
     const mb = buffs(me), ob = buffs(other);
     const tOther = terrainAt(b, otherPos.x, otherPos.y) || { def: 0, avo: 0 };
     const magic = w.dmg === 'mag';
     const carryMe = me.carrying ? 0.5 : 1, carryOther = other.carrying ? 0.5 : 1;
-    const ms = { skl: Math.floor(me.stats.skl * carryMe), spd: Math.floor(me.stats.spd * carryMe) };
-    const os = { spd: Math.floor(other.stats.spd * carryOther) };
+    const ms = { skl: Math.floor(statOf(me, 'skl') * carryMe), spd: Math.floor(statOf(me, 'spd') * carryMe) };
+    const os = { spd: Math.floor(statOf(other, 'spd') * carryOther) };
     // 技能與支援
     const myBonus = { hit: 0, avo: 0, crit: 0, dmg: 0, block: 0 }, otBonus = { hit: 0, avo: 0, crit: 0, dmg: 0, block: 0 };
     for (const sk of skillsOf(b, me)) if (sk.effect === 'bonus') for (const k in myBonus) myBonus[k] += sk[k] || 0;
@@ -275,8 +295,8 @@
     }
     // 位置加成（只給主動攻擊方）：朝向、突進、高低差
     const pos = positionBonus(b, me, other, myPos, otherPos, w, opts);
-    const atk = (magic ? me.stats.mag : me.stats.str) + mt + tri * R.triangleDmg + myBonus.dmg + sMe.dmg + pos.dmg;
-    const defStat = (magic ? other.stats.res : other.stats.def) + (tOther.def || 0);
+    const atk = (magic ? statOf(me, 'mag') : statOf(me, 'str')) + mt + tri * R.triangleDmg + myBonus.dmg + sMe.dmg + pos.dmg;
+    const defStat = (magic ? statOf(other, 'res') : statOf(other, 'def')) + (tOther.def || 0);
     const tags = pos.tags.slice();
     const finish = (raw) => {
       let dmg = Math.max(0, raw - otBonus.block);
@@ -289,8 +309,11 @@
     const dmgLuna = finish(Math.max(0, atk));
     if (mb.valor) tags.push('熱血');
     if (ob.ironWall) tags.push('對方鐵壁');
-    let hitRaw = (w.hit || 0) + wl * (w.upHit != null ? w.upHit : 3) + ms.skl * 2 + Math.floor(me.stats.lck / 2) + tri * R.triangleHit + myBonus.hit + sMe.hit + pos.hit;
-    let avo = os.spd * 2 + other.stats.lck + (tOther.avo || 0) + otBonus.avo + sOt.avo;
+    let hitRaw = (w.hit || 0) + wl * (w.upHit != null ? w.upHit : 3) + ms.skl * 2 + Math.floor(statOf(me, 'lck') / 2) + tri * R.triangleHit + myBonus.hit + sMe.hit + pos.hit;
+    let avo = os.spd * 2 + statOf(other, 'lck') + (tOther.avo || 0) + otBonus.avo + sOt.avo;
+    hitRaw += statOf(me, 'hit');
+    avo += statOf(other, 'avo');
+    if (disabled(other)) { avo = 0; tags.push('對方無法行動'); }
     if (mb.focus) { hitRaw += 30; tags.push('集中'); }
     if (ob.focus) avo += 30;
     let hitBase = clamp(hitRaw - avo, 0, 100);
@@ -298,7 +321,7 @@
     const hit = ob.alert ? 0 : hitBase;
     if (ob.alert) tags.push('對方閃避');
     if (sMe.partners.length) tags.push('支援 ' + sMe.partners.join('、'));
-    const crit = clamp((w.crit || 0) + Math.floor(ms.skl / 2) - other.stats.lck + myBonus.crit + sMe.crit + pos.crit, 0, 100);
+    const crit = clamp((w.crit || 0) + Math.floor(ms.skl / 2) - statOf(other, 'lck') + myBonus.crit + sMe.crit + pos.crit, 0, 100);
     const purs = hasSkill(b, me, 'pursuit');
     const threshold = R.doubleThreshold - (purs ? (purs.value || 2) : 0);
     const count = opts.ignoreRange ? 1 : (ms.spd - os.spd >= threshold ? 2 : 1);
@@ -367,6 +390,7 @@
     const crit = hit && rng.roll(s.crit);
     const dmg = hit ? Math.min(tg.hp, crit ? base * R.critMult : base) : 0;
     tg.hp -= dmg;
+    if (dmg > 0 && tg.status && tg.status.sleep) delete tg.status.sleep;   // 受到傷害就醒來
     let drain = 0;
     if (hit && dmg > 0) { const so = proc('sol'); if (so) { drain = Math.min(me.stats.hp - me.hp, dmg); me.hp += drain; skills.push(so.name); } }
     return { by: me.uid, target: tg.uid, hit, crit, dmg, hpAfter: tg.hp, evaded, skills, drain, hpSelf: me.hp };
@@ -498,7 +522,7 @@
   }
 
   SRPG.rules = {
-    DEFAULT_RULES, DIRS, dirToward, facingRelation, isFlier, heightAt, canCharge, positionBonus, TRIANGLE, EFFECTS, SKILL_EFFECTS, SUPPORT_BONUS, rulesOf, friendly, onMap,
+    DEFAULT_RULES, STATUSES, statOf, disabled, DIRS, dirToward, facingRelation, isFlier, heightAt, canCharge, positionBonus, TRIANGLE, EFFECTS, SKILL_EFFECTS, SUPPORT_BONUS, rulesOf, friendly, onMap,
     skillsOf, hasSkill, skillRate, terrainAt, moveCost, moveOf, unitAt, reachable, pathTo,
     weaponDef, weaponOf, weaponRange, canHitAt, isStaff, isMapWeapon, weaponCost, canAfford, payCost, usable,
     canAttackWith, attackWeapons, staves, mapWeapons, attackTilesFrom, threatTiles,

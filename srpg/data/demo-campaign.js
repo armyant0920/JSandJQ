@@ -342,6 +342,99 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "price": 1500
   }
  },
+ "abilities": {
+  "dawn_strike": {
+   "name": "晨星斬",
+   "desc": "直線 3 格的光之斬擊（氣力 110）",
+   "target": "enemy",
+   "range": [
+    1,
+    1
+   ],
+   "area": {
+    "shape": "line",
+    "size": 3
+   },
+   "power": 8,
+   "dmg": "phys",
+   "hit": 90,
+   "crit": 10,
+   "cost": 6,
+   "morale": 110,
+   "cooldown": 2,
+   "fx": "holy",
+   "color": "#fff3a0",
+   "anim": "special_meteor"
+  },
+  "pin_shot": {
+   "name": "麻痺箭",
+   "desc": "射擊並使目標緩速（移動 -2）",
+   "target": "enemy",
+   "range": [
+    2,
+    3
+   ],
+   "area": {
+    "shape": "single"
+   },
+   "power": 3,
+   "dmg": "phys",
+   "hit": 90,
+   "cost": 3,
+   "fx": "slash",
+   "color": "#7ad7ff",
+   "effects": [
+    {
+     "status": "slow",
+     "chance": 100,
+     "turns": 2
+    }
+   ]
+  },
+  "smoke": {
+   "name": "煙幕",
+   "desc": "周圍同伴迴避 +20（1 回合）",
+   "target": "ally",
+   "range": [
+    0,
+    0
+   ],
+   "area": {
+    "shape": "burst",
+    "size": 1
+   },
+   "cost": 3,
+   "cooldown": 2,
+   "fx": "wind",
+   "color": "#cfcfcf",
+   "effects": [
+    {
+     "stat": "avo",
+     "value": 20,
+     "turns": 1
+    }
+   ]
+  },
+  "dive": {
+   "name": "俯衝",
+   "desc": "從空中直線衝下，貫穿 2 格",
+   "target": "enemy",
+   "range": [
+    1,
+    1
+   ],
+   "area": {
+    "shape": "line",
+    "size": 2
+   },
+   "power": 4,
+   "dmg": "phys",
+   "hit": 85,
+   "cost": 3,
+   "fx": "wind",
+   "color": "#b8ffd8"
+  }
+ },
  "items": {
   "master_seal": {
    "name": "騎士勳章",
@@ -720,6 +813,19 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "st": 20,
    "skills": [
     "vigilant"
+   ],
+   "abilities": [
+    "whirlwind"
+   ],
+   "learn": [
+    {
+     "level": 3,
+     "ability": "war_cry"
+    },
+    {
+     "level": 6,
+     "ability": "dawn_strike"
+    }
    ]
   },
   "mira": {
@@ -763,6 +869,15 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "st": 18,
    "skills": [
     "charge"
+   ],
+   "abilities": [
+    "pierce"
+   ],
+   "learn": [
+    {
+     "level": 4,
+     "ability": "shield_bash"
+    }
    ]
   },
   "rook": {
@@ -802,6 +917,15 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "st": 15,
    "skills": [
     "keen"
+   ],
+   "abilities": [
+    "arrow_rain"
+   ],
+   "learn": [
+    {
+     "level": 4,
+     "ability": "pin_shot"
+    }
    ]
   },
   "elle": {
@@ -843,7 +967,20 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "effort"
    ],
    "mp": 24,
-   "st": 8
+   "st": 8,
+   "abilities": [
+    "fireball"
+   ],
+   "learn": [
+    {
+     "level": 3,
+     "ability": "ice_lance"
+    },
+    {
+     "level": 5,
+     "ability": "thunder_cross"
+    }
+   ]
   },
   "lina": {
    "name": "莉娜",
@@ -884,7 +1021,24 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "alert"
    ],
    "mp": 30,
-   "st": 8
+   "st": 8,
+   "abilities": [
+    "heal_circle"
+   ],
+   "learn": [
+    {
+     "level": 3,
+     "ability": "purify"
+    },
+    {
+     "level": 4,
+     "ability": "holy_shield"
+    },
+    {
+     "level": 6,
+     "ability": "regen_aura"
+    }
+   ]
   },
   "kit": {
    "name": "基特",
@@ -926,6 +1080,15 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "st": 20,
    "skills": [
     "adept"
+   ],
+   "abilities": [
+    "poison_blade"
+   ],
+   "learn": [
+    {
+     "level": 5,
+     "ability": "smoke"
+    }
    ]
   },
   "sera": {
@@ -963,7 +1126,11 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "alert",
     "strike"
    ],
-   "st": 18
+   "st": 18,
+   "abilities": [
+    "dive",
+    "haste"
+   ]
   },
   "bandit": {
    "name": "山賊",
@@ -1052,7 +1219,10 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "spirits": [
     "valor"
    ],
-   "sp": 30
+   "sp": 30,
+   "abilities": [
+    "war_cry"
+   ]
   },
   "soldier": {
    "name": "帝國兵",
@@ -1126,7 +1296,10 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "weapons": [
     "fire"
    ],
-   "mp": 12
+   "mp": 12,
+   "abilities": [
+    "fireball"
+   ]
   },
   "imp_pegasus": {
    "name": "帝國天馬",
@@ -1215,7 +1388,11 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    ],
    "sp": 40,
    "morale": 110,
-   "sprite": "mage"
+   "sprite": "mage",
+   "abilities": [
+    "sleep_mist",
+    "weaken"
+   ]
   },
   "emperor": {
    "name": "皇帝傑羅斯",
@@ -1247,6 +1424,9 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "morale": 110,
    "items": [
     "elixir"
+   ],
+   "abilities": [
+    "whirlwind"
    ]
   },
   "imp_cleric": {
@@ -1266,7 +1446,10 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "weapons": [
     "heal_staff"
    ],
-   "mp": 15
+   "mp": 15,
+   "abilities": [
+    "heal_circle"
+   ]
   },
   "voss": {
    "name": "沃斯將軍",
@@ -1295,6 +1478,9 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "skills": [
     "luna",
     "vigilant"
+   ],
+   "abilities": [
+    "shield_bash"
    ],
    "spirits": [
     "valor",
@@ -3521,6 +3707,10 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "cmd": "say",
     "who": "rook",
     "text": "看！有個小偷抱著村裡的萬靈藥往東南邊跑了！"
+   },
+   {
+    "cmd": "narrate",
+    "text": "【技能】行動選單的「技能」是有範圍的招式與魔法：選擇後地圖上會亮出作用範圍，不會被反擊。艾倫的旋風斬打周圍所有敵人、艾兒的火球術炸一片、莉娜的治癒之環一次治療多人。升級時還會學會新技能。"
    },
    {
     "cmd": "narrate",

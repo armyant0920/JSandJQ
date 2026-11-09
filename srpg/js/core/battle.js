@@ -214,6 +214,7 @@
     if (targetsFrom(b, u).length) acts.push({ id: 'attack', name: '攻擊' });
     if (healTargets(b, u).length) acts.push({ id: 'staff', name: '杖' });
     if (R.mapWeapons(b, u).length) acts.push({ id: 'mapAttack', name: '地圖兵器' });
+    if ((u.abilities || []).length && SRPG.ability) acts.push({ id: 'ability', name: '技能', disabled: !SRPG.ability.usableList(b, u).length });
     const sp = spiritsUsable(b, u);
     if (sp.length) acts.push({ id: 'spirit', name: '精神', free: true, disabled: !sp.some((s) => (s.cost || 0) <= u.sp) });
     if ((u.items || []).length) acts.push({ id: 'item', name: '道具', disabled: !u.items.some((_, i) => itemUsable(b, u, i)) });
@@ -283,7 +284,11 @@
     if (me.buffs && me.buffs.effort) { e = Math.min(100, e * 2); delete me.buffs.effort; }
     res.exp[me.uid] = e;
     const ups = R.addExp(b, me, e, b.rng);
-    if (ups.length) res.levelUps[me.uid] = ups;
+    if (ups.length) {
+      res.levelUps[me.uid] = ups;
+      const l = SRPG.ability ? SRPG.ability.learnFor(b, me) : [];
+      if (l.length) (res.learned = res.learned || {})[me.uid] = l;
+    }
   }
 
   // 攻擊：回傳 { combat, exp:{uid:amount}, levelUps:{uid:[gains]}, deaths:[unit] }
@@ -521,6 +526,8 @@
     u.skills = [...new Set(u.skills.concat(nc.skills || []))];
     for (const w of (route && route.weapons) || []) if (c.weapons[w]) u.weapons.push(w);
     if (R.rulesOf(b).promoteReset) { u.level = 1; u.exp = 0; }
+    u.abilities = [...new Set((u.abilities || []).concat(nc.abilities || [], (route && route.abilities) || []))];
+    if (SRPG.ability) SRPG.ability.learnFor(b, u);
     return u;
   }
 
@@ -593,6 +600,7 @@
         if (u.maxMp) u.mp = Math.min(u.maxMp, u.mp + RU.mpRegen);
       }
       if (u.buffs) for (const k of Object.keys(u.buffs)) if ((R.EFFECTS[k] || {}).kind === 'turn') delete u.buffs[k];
+      if (SRPG.ability) msgs.push(...SRPG.ability.phaseStart(b, u));
       const t = R.terrainAt(b, u.x, u.y);
       if (t && t.heal && u.hp < u.stats.hp) {
         const h = Math.min(u.stats.hp - u.hp, Math.ceil(u.stats.hp * t.heal / 100));
@@ -654,7 +662,7 @@
       if (u.team !== 'player') continue;
       roster[u.id] = {
         level: u.level, exp: u.exp, stats: clone(u.stats), weapons: clone(u.weapons), items: clone(u.items || []),
-        skills: clone(u.skills || []), cls: u.cls, wup: clone(u.wup || {}), upg: clone(u.upg || {}),
+        skills: clone(u.skills || []), abilities: clone(u.abilities || []), cls: u.cls, wup: clone(u.wup || {}), upg: clone(u.upg || {}),
         dead: permadeath && u.hp <= 0,
       };
     }
@@ -692,7 +700,7 @@
     healTargets, tradePartners, spiritsUsable, spiritTargets, rescueTargets, dropTiles, supportTargets, nextSupportRank,
     attack, mapAttack, heal, useItem, transfer, useSpirit, rescue, drop, supportTalk, gainSupportPoints,
     cantoMove, endCanto, talk, visit, seize, wait, startPhase, endPhase, phaseDone, checkOutcome,
-    objectiveText, commitRoster, rewindsLeft, rewindTo, faceNearestFoe, turnTo, takeLoot, wakeAmbush, ambushTriggered, checkAmbushes, escapePoint, escape, spawn, recruit, give, learn, promote, itemUsable,
+    objectiveText, commitRoster, finishAction, rewindsLeft, rewindTo, faceNearestFoe, turnTo, takeLoot, wakeAmbush, ambushTriggered, checkAmbushes, escapePoint, escape, spawn, recruit, give, learn, promote, itemUsable,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = SRPG;
 })(typeof window !== 'undefined' ? window : globalThis);

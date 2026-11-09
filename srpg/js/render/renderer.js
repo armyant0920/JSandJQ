@@ -184,6 +184,80 @@
       ctx.fillStyle = '#ff9ae8'; ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
       ctx.fillText('◆', px + TS - 2, py + 1);
     }
+    // 狀態異常（左下角小字）與增益/減益箭頭（右側）
+    const STS = SRPG.rules && SRPG.rules.STATUSES;
+    const st = u.status ? Object.keys(u.status) : [];
+    if (STS && st.length) {
+      ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom';
+      st.slice(0, 3).forEach((k, i) => {
+        const d = STS[k] || { short: '?', color: '#fff' };
+        const x = px + 1 + i * 12, y = py + TS - 5;
+        ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(x, y - 11, 11, 11);
+        ctx.fillStyle = d.color; ctx.fillText(d.short, x + 0.5, y);
+      });
+    }
+    if (u.mods && u.mods.length) {
+      const up = u.mods.some((m) => m.value > 0), dn = u.mods.some((m) => m.value < 0);
+      ctx.font = 'bold 11px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+      if (up) { ctx.fillStyle = '#7dffa0'; ctx.fillText('▲', px + TS - 2, py + 13); }
+      if (dn) { ctx.fillStyle = '#ff7a7a'; ctx.fillText('▼', px + TS - 2, py + (up ? 24 : 13)); }
+    }
+  }
+
+  /* 技能範圍特效：fx = { tiles:[{x,y}], kind, color, t0, ms } */
+  function drawAreaFx(ctx, list, now) {
+    for (const f of list) {
+      const ms = f.ms || 900;
+      const age = (now - f.t0) / ms;
+      if (age < 0 || age > 1) continue;
+      const col = f.color || '#fff';
+      ctx.save();
+      for (const p of f.tiles) {
+        const px = p.x * TS, py = p.y * TS, cx = px + TS / 2, cy = py + TS / 2;
+        ctx.globalAlpha = 0.35 * (1 - age);
+        ctx.fillStyle = col; ctx.fillRect(px + 1, py + 1, TS - 2, TS - 2);
+        ctx.globalAlpha = Math.min(1, (1 - age) * 1.6);
+        ctx.fillStyle = col; ctx.strokeStyle = col;
+        const r = (i) => hash(p.x, p.y, i + Math.floor(f.t0) % 97);
+        switch (f.kind) {
+          case 'fire':
+            for (let i = 0; i < 6; i++) { const x = px + 6 + r(i) * (TS - 12), y = py + TS - 6 - ((age * 1.4 + r(i + 9)) % 1) * (TS - 6); ctx.beginPath(); ctx.arc(x, y, 3 + r(i + 3) * 5 * (1 - age), 0, Math.PI * 2); ctx.fill(); }
+            break;
+          case 'ice':
+            for (let i = 0; i < 4; i++) { const x = px + 8 + r(i) * (TS - 16), y = py + 8 + r(i + 5) * (TS - 16), s = 6 + 6 * Math.sin(age * Math.PI); ctx.beginPath(); ctx.moveTo(x, y - s); ctx.lineTo(x + s / 2, y); ctx.lineTo(x, y + s); ctx.lineTo(x - s / 2, y); ctx.closePath(); ctx.fill(); }
+            break;
+          case 'thunder':
+            if (age < 0.6) { ctx.lineWidth = 3; ctx.beginPath(); let x = cx + (r(1) - 0.5) * 10, y = py - 4; ctx.moveTo(x, y); for (let i = 0; i < 5; i++) { x += (r(i + 2) - 0.5) * 16; y += TS / 5; ctx.lineTo(x, y); } ctx.stroke(); }
+            break;
+          case 'wind': case 'slash':
+            ctx.lineWidth = 3;
+            for (let i = 0; i < 2; i++) { ctx.beginPath(); ctx.arc(cx, cy, 10 + i * 8, age * 8 + i * 2, age * 8 + i * 2 + 2.2); ctx.stroke(); }
+            break;
+          case 'earth':
+            ctx.fillStyle = '#7a5a3a';
+            for (let i = 0; i < 5; i++) { const x = px + 6 + r(i) * (TS - 12), y = py + TS - 8 - Math.sin(Math.min(1, age * 1.5 + r(i)) * Math.PI) * 18; ctx.fillRect(x, y, 6, 5); }
+            break;
+          case 'holy':
+            ctx.globalAlpha *= 0.8; ctx.fillRect(cx - 6 - 4 * Math.sin(age * Math.PI), py - TS, 12 + 8 * Math.sin(age * Math.PI), TS * 2 - 4);
+            break;
+          case 'dark':
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 3; i++) { ctx.beginPath(); ctx.arc(cx, cy, (6 + i * 7) * (1 - age * 0.6), age * 6 + i, age * 6 + i + 3.5); ctx.stroke(); }
+            break;
+          case 'poison':
+            for (let i = 0; i < 5; i++) { const x = px + 6 + r(i) * (TS - 12), y = py + TS - 4 - ((age + r(i + 7)) % 1) * TS * 0.8; ctx.beginPath(); ctx.arc(x, y, 3 + r(i) * 3, 0, Math.PI * 2); ctx.stroke(); }
+            break;
+          case 'heal': case 'buff': {
+            ctx.font = 'bold 16px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            for (let i = 0; i < 3; i++) ctx.fillText(f.kind === 'heal' ? '+' : '▲', px + 10 + i * 14, py + TS - 6 - ((age + i * 0.3) % 1) * (TS - 8));
+            break;
+          }
+          default:
+            ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(cx, cy, 4 + age * 20, 0, Math.PI * 2); ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
   }
 
   function tint(ctx, tiles, color) {
@@ -231,5 +305,5 @@
     }
   }
 
-  SRPG.renderer = { TS, drawTerrain, drawMap, drawHeights, drawUnit, spriteFor, tint, drawCursor, drawPath, drawFx };
+  SRPG.renderer = { TS, drawTerrain, drawMap, drawHeights, drawAreaFx, drawUnit, spriteFor, tint, drawCursor, drawPath, drawFx };
 })(typeof window !== 'undefined' ? window : globalThis);

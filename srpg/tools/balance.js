@@ -8,8 +8,9 @@ const path = require('path');
 const fs = require('fs');
 const vm = require('vm');
 const ROOT = path.join(__dirname, '..');
-for (const f of ['util', 'media', 'campaign', 'rules', 'battle', 'ai', 'script', 'save', 'prep']) require(path.join(ROOT, 'js/core', f + '.js'));
-const { campaign: C, rules: R, battle: B, ai: AI, script: S, prep: P, util: U } = globalThis.SRPG;
+for (const f of ['util', 'media', 'campaign', 'rules', 'battle', 'ability', 'ai', 'script', 'save', 'prep']) require(path.join(ROOT, 'js/core', f + '.js'));
+const SRPG = globalThis.SRPG;
+const { campaign: C, rules: R, battle: B, ai: AI, script: S, prep: P, util: U } = SRPG;
 
 function loadCampaign(file) {
   const src = fs.readFileSync(file, 'utf8');
@@ -79,6 +80,7 @@ function act(b, u, seed) {
   if (p.x !== u.x || p.y !== u.y) B.moveUnit(b, u, p.x, p.y);
   const t = p.target && B.byUid(b, p.target);
   if (p.escape) B.escape(b, u);
+  else if (p.ability) SRPG.ability.use(b, u, p.ability.id, p.ability.at);
   else if (p.map) B.mapAttack(b, u, p.map.weapon, p.map.at);
   else if (t && t.hp > 0) B.attack(b, u, t);
   else if (p.heal) B.heal(b, u, B.byUid(b, p.heal));

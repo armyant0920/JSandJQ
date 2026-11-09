@@ -7,7 +7,7 @@ const fs = require('fs');
 const vm = require('vm');
 
 const ROOT = path.join(__dirname, '..');
-for (const f of ['util', 'media', 'campaign', 'rules', 'battle', 'ai', 'script', 'save', 'prep']) require(path.join(ROOT, 'js/core', f + '.js'));
+for (const f of ['util', 'media', 'campaign', 'rules', 'battle', 'ability', 'ai', 'script', 'save', 'prep']) require(path.join(ROOT, 'js/core', f + '.js'));
 const SRPG = globalThis.SRPG;
 const { campaign: C, rules: R, battle: B, ai: AI, script: S, save: SV, util: U, prep: P, media: M } = SRPG;
 
@@ -232,7 +232,8 @@ test('名冊：永久死亡的角色下一章不出場', () => {
 
 test('示範全章節：雙方全自動對打能正常結束', () => {
   const c = loadDemo();
-  let mapUsed = 0;
+  let mapUsed = 0, abUsed = 0;
+  const A = SRPG.ability;
   for (const [ch, seed] of [['ch1', 1], ['ch1', 2], ['ch1', 3], ['ch2a', 4], ['ch2b', 5], ['ch3', 6], ['ch3', 7]]) {
     const b = B.createBattle(c, ch, { seed, flags: { kit_joined: true } });
     B.startPhase(b, 'player');
@@ -244,7 +245,8 @@ test('示範全章節：雙方全自動對打能正常結束', () => {
         for (const sid of AI.pickSpirits(b, u, p)) B.useSpirit(b, u, sid);
         if (p.x !== u.x || p.y !== u.y) B.moveUnit(b, u, p.x, p.y);
         const t = p.target && B.byUid(b, p.target);
-        if (p.map) { mapUsed++; B.mapAttack(b, u, p.map.weapon, p.map.at); }
+        if (p.ability) { abUsed++; assert.ok(A.use(b, u, p.ability.id, p.ability.at), '技能計畫可執行'); }
+        else if (p.map) { mapUsed++; B.mapAttack(b, u, p.map.weapon, p.map.at); }
         else if (t && t.hp > 0) B.attack(b, u, t);
         else if (p.heal) B.heal(b, u, B.byUid(b, p.heal));
         else if (p.item != null) B.useItem(b, u, p.item);
@@ -255,7 +257,8 @@ test('示範全章節：雙方全自動對打能正常結束', () => {
     // 壓制戰需要主動走到王座，自動對打不保證結束
     if ((c.chapters[ch].victory || {}).type !== 'seize') assert.notEqual(b.status, 'playing', ch + ' seed ' + seed + ' 未結束');
   }
-  assert.ok(mapUsed > 0, '地圖兵器至少被使用一次');
+  assert.ok(mapUsed + abUsed > 0, '範圍攻擊至少被使用一次');
+  assert.ok(abUsed > 5, '技能有被使用');
 });
 
 test('條件出場：未說服的角色不會出現在下一章', () => {
@@ -833,4 +836,149 @@ test('回溯：次數限制、還原狀態（含亂數）', () => {
   assert.equal(B.rewindsLeft(nb), 0);
   assert.equal(B.rewindsLeft(farland({ rewind: -1 }).b), Infinity);
   assert.equal(B.rewindsLeft(farland({}).b), 0);
+});
+
+/* ---------- 主動技能 ---------- */
+const A = SRPG.ability;
+function abBattle(units, rules, extra) {
+  const c = mini(Object.assign({ meta: { start: 'c', rules: Object.assign({}, rules) } }, extra || {}));
+  c.chapters.c.map = { rows: ['.......', '.......', '.......', '.......', '.......'] };
+  c.chapters.c.units = units;
+  const b = B.createBattle(c, 'c', { seed: 11 });
+  return { c, b };
+}
+
+test('技能範圍：菱形、方形、十字、直線、扇形、空心', () => {
+  const at = { x: 3, y: 3 }, from = { x: 3, y: 4 };
+  const n = (ab) => A.shapeTiles(ab, from, at).length;
+  assert.equal(n({ area: { shape: 'single' } }), 1);
+  assert.equal(n({ area: { shape: 'burst', size: 1 } }), 5);
+  assert.equal(n({ area: { shape: 'burst', size: 1, hollow: true } }), 4);
+  assert.equal(n({ area: { shape: 'square', size: 1 } }), 9);
+  assert.equal(n({ area: { shape: 'cross', size: 2 } }), 9);
+  const line = A.shapeTiles({ area: { shape: 'line', size: 3 } }, from, at);
+  assert.deepEqual(line.map((p) => p.y), [3, 2, 1]);
+  assert.equal(n({ area: { shape: 'cone', size: 3 } }), 9);
+  assert.equal(A.shapeTiles({ area: { shape: 'all' } }, from, at, 7, 5).length, 35);
+});
+
+test('攻擊技能：範圍內敵人各受一擊、不會反擊、消耗與冷卻、經驗', () => {
+  const { b } = abBattle([
+    { unit: 'a', team: 'player', x: 3, y: 2 },
+    { unit: 'e', team: 'enemy', x: 3, y: 1 }, { unit: 'e', team: 'enemy', x: 2, y: 2 }, { unit: 'e', team: 'enemy', x: 6, y: 4 },
+  ], { resources: true });
+  const [a, e1, e2, e3] = b.units;
+  a.abilities = ['whirlwind']; a.st = 10; a.maxSt = 10;
+  b.campaign.abilities.whirlwind.hit = 100;
+  const hpA = a.hp;
+  const r = A.use(b, a, 'whirlwind', { x: 3, y: 2 });
+  assert.equal(r.results.length, 2, '兩個相鄰敵人');
+  assert.ok(e1.hp < e1.stats.hp && e2.hp < e2.stats.hp); assert.equal(e3.hp, e3.stats.hp);
+  assert.equal(a.hp, hpA, '不會被反擊');
+  assert.equal(a.st, 6); assert.ok(a.acted); assert.ok(r.exp[a.uid] > 0);
+  // 冷卻
+  b.campaign.abilities.whirlwind.cooldown = 2;
+  a.acted = false; a.st = 10;
+  A.use(b, a, 'whirlwind', { x: 3, y: 2 });
+  assert.equal(A.blockReason(b, a, A.abilityDef(b, 'whirlwind')), '冷卻 2');
+  A.phaseStart(b, a); A.phaseStart(b, a);
+  assert.equal(A.blockReason(b, a, A.abilityDef(b, 'whirlwind')), null);
+  // 體力不足
+  a.st = 1;
+  assert.equal(A.blockReason(b, a, A.abilityDef(b, 'whirlwind')), '體力不足');
+});
+
+test('支援技能：範圍回復、增益隨回合消失、淨化', () => {
+  const { b } = abBattle([
+    { unit: 'a', team: 'player', x: 3, y: 2 }, { unit: 'r', team: 'player', x: 3, y: 3 }, { unit: 'e', team: 'enemy', x: 0, y: 0 },
+  ]);
+  const [a, r, e] = b.units;
+  a.abilities = ['heal_circle', 'holy_shield', 'purify'];
+  a.hp = 5; r.hp = 5;
+  const res = A.use(b, a, 'heal_circle', { x: 3, y: 2 });
+  assert.equal(res.results.length, 2);
+  assert.ok(a.hp > 5 && r.hp > 5);
+  assert.ok(!res.results.some((x) => x.target === e.uid));
+  a.acted = false;
+  const def0 = R.statOf(r, 'def');
+  A.use(b, a, 'holy_shield', { x: 3, y: 3 });
+  assert.equal(R.statOf(r, 'def'), def0 + 4);
+  A.phaseStart(b, r); assert.equal(R.statOf(r, 'def'), def0 + 4, '還剩 1 回合');
+  A.phaseStart(b, r); assert.equal(R.statOf(r, 'def'), def0, '效果結束');
+  r.status = { poison: 3 }; A.addMod(r, 'str', -3, 2);
+  a.acted = false;
+  A.use(b, a, 'purify', { x: 3, y: 3 });
+  assert.deepEqual(r.status, {}); assert.equal(r.mods.length, 0);
+});
+
+test('狀態異常：睡眠無法行動與反擊、受傷醒來；中毒不致死；擊退；吸血；沉默', () => {
+  const { b } = abBattle([{ unit: 'a', team: 'player', x: 3, y: 2 }, { unit: 'e', team: 'enemy', x: 4, y: 2 }]);
+  const [a, e] = b.units;
+  A.addStatus(e, 'sleep', 1);
+  assert.equal(R.forecast(b, a, e).def, null, '睡眠中不能反擊');
+  assert.equal(R.forecast(b, a, e).att.hit, R.forecast(b, a, e).att.hitBase);
+  e.acted = false;
+  A.phaseStart(b, e);
+  assert.ok(e.acted, '睡眠中跳過行動'); assert.ok(!e.status.sleep, '1 回合後醒來');
+  A.addStatus(e, 'sleep', 2);
+  b.campaign.weapons.sword.hit = 100; a.stats.skl = 50;
+  B.attack(b, a, e);
+  if (e.hp < e.stats.hp) assert.ok(!(e.status || {}).sleep, '受傷醒來');
+  // 中毒
+  e.hp = 1; A.addStatus(e, 'poison', 2);
+  A.phaseStart(b, e); assert.equal(e.hp, 1, '中毒不致死');
+  e.hp = 20; A.phaseStart(b, e); assert.equal(e.hp, 18);
+  // 擊退
+  e.x = 4; e.y = 2;
+  A.push(b, a, e, 2); assert.deepEqual([e.x, e.y], [6, 2]);
+  // 吸血
+  a.abilities = ['drain_touch']; a.acted = false; a.hp = 5; e.x = 4; e.hp = 20;
+  b.campaign.abilities.drain_touch.hit = 100; a.stats.mag = 10;
+  const r = A.use(b, a, 'drain_touch', { x: 4, y: 2 });
+  assert.ok(r.results[0].dmg > 0); assert.ok(a.hp > 5);
+  // 沉默
+  a.acted = false; A.addStatus(a, 'silence', 1);
+  assert.equal(A.blockReason(b, a, A.abilityDef(b, 'drain_touch')), '沉默中');
+});
+
+test('技能學習：初始等級、升級學會、轉職技能、存入名冊', () => {
+  const c = mini();
+  c.classes.foot.learn = [{ level: 1, ability: 'whirlwind' }, { level: 2, ability: 'war_cry' }];
+  c.classes.elite = { move: 4, abilities: ['pierce'] };
+  const b = B.createBattle(c, 'c', { seed: 3 });
+  const a = b.units[0];
+  assert.deepEqual(a.abilities, ['whirlwind']);
+  a.exp = 99;
+  const ups = R.addExp(b, a, 5, b.rng);
+  assert.equal(ups.length, 1);
+  assert.deepEqual(A.learnFor(b, a), ['戰吼']);
+  B.promote(b, a, 'elite');
+  assert.ok(a.abilities.includes('pierce'));
+  const roster = B.commitRoster(b, {});
+  assert.deepEqual(roster.a.abilities, a.abilities);
+  assert.deepEqual(C.validate(c), []);
+  c.units.a.abilities = ['nope'];
+  assert.ok(C.validate(c).some((x) => x.includes('nope')));
+});
+
+test('AI 會使用範圍技能、治療技能', () => {
+  const { b } = abBattle([
+    { unit: 'a', team: 'player', x: 3, y: 2 }, { unit: 'r', team: 'player', x: 3, y: 3 },
+    { unit: 'e', team: 'enemy', x: 6, y: 2 },
+  ]);
+  const [, , e] = b.units;
+  e.abilities = ['fireball']; e.stats.mag = 8;
+  b.units[1].stats.spd = 10; b.units[1].stats.def = 3;   // 普通攻擊打不死任何人
+  b.campaign.abilities.fireball.power = 6;
+  const p = AI.plan(b, e);
+  assert.ok(p.ability, '用火球同時打兩人');
+  assert.equal(p.ability.id, 'fireball');
+  const hit = A.victims(b, Object.assign({}, e, { x: p.x, y: p.y }), A.abilityDef(b, 'fireball'), A.area(b, Object.assign({}, e, { x: p.x, y: p.y }), A.abilityDef(b, 'fireball'), p.ability.at));
+  assert.equal(hit.length, 2);
+  // 治療
+  const h = abBattle([{ unit: 'a', team: 'player', x: 0, y: 0 }, { unit: 'e', team: 'enemy', x: 3, y: 2 }, { unit: 'e', team: 'enemy', x: 4, y: 2 }]);
+  const [, h1, h2] = h.b.units;
+  h1.abilities = ['heal_circle']; h2.hp = 4; h1.hp = 6;
+  const hp = AI.plan(h.b, h1);
+  assert.ok(hp.ability && hp.ability.id === 'heal_circle');
 });

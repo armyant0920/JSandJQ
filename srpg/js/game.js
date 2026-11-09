@@ -106,10 +106,15 @@
       RD.tint(ctx, G.threat.atk, 'rgba(255,70,70,0.32)');
       RD.drawPath(ctx, G.path);
     }
-    if (G.mode === 'target' && G.targets) RD.tint(ctx, G.targets.map((u) => u.x + ',' + u.y), G.targetKind === 'attack' ? 'rgba(255,70,70,0.45)' : G.targetKind === 'map' ? 'rgba(255,170,60,0.30)' : 'rgba(80,230,140,0.45)');
+    if (G.mode === 'target' && G.targets) RD.tint(ctx, G.targets.map((u) => u.x + ',' + u.y), G.targetKind === 'attack' ? 'rgba(255,70,70,0.45)' : G.targetKind === 'map' || G.targetKind === 'ability' ? 'rgba(255,170,60,0.30)' : 'rgba(80,230,140,0.45)');
     if (G.mode === 'target' && G.targetKind === 'map' && G.targets.some((p) => p.x === G.cursor.x && p.y === G.cursor.y)) {
       const me = B.byUid(b, G.sel);
       RD.tint(ctx, R.mapArea(b, me, G.mapW.w, G.cursor).map((p) => p.x + ',' + p.y), 'rgba(255,120,30,0.55)');
+    }
+    if (G.mode === 'target' && G.targetKind === 'ability' && G.targets.some((p) => p.x === G.cursor.x && p.y === G.cursor.y)) {
+      const me = B.byUid(b, G.sel);
+      const ab = G.ab;
+      RD.tint(ctx, SRPG.ability.area(b, me, ab, G.cursor).map((p) => p.x + ',' + p.y), ab.target === 'ally' || ab.target === 'self' ? 'rgba(90,230,140,0.5)' : 'rgba(255,120,30,0.55)');
     }
     if (G.mode === 'canto' && G.reach) RD.tint(ctx, [...G.reach.values()].filter((n) => n.stop).map((n) => n.x + ',' + n.y), 'rgba(70,200,255,0.40)');
     if (G.flash && now - G.flash.t0 < 500) RD.tint(ctx, G.flash.tiles.map((p) => p.x + ',' + p.y), `rgba(255,200,80,${0.6 * (1 - (now - G.flash.t0) / 500)})`);
@@ -137,6 +142,7 @@
       ctx.globalAlpha = 1;
     }
     if (['idle', 'move', 'target', 'canto'].includes(G.mode)) RD.drawCursor(ctx, G.cursor.x, G.cursor.y, now, G.mode === 'target' ? (G.targetKind === 'attack' ? '#ff6464' : '#5ae07a') : '#fff');
+    if (G.areaFx && G.areaFx.length) { RD.drawAreaFx(ctx, G.areaFx, now); G.areaFx = G.areaFx.filter((f) => now - f.t0 < (f.ms || 900)); }
     RD.drawFx(ctx, G.fx.filter((f) => f.text), now);
     G.fx = G.fx.filter((f) => now - f.t0 < 1000 || !f.t0);
   }
@@ -330,6 +336,12 @@
       playPhaseBgm();
       UI.sfx('phase');
       await UI.banner(B.PHASE_NAMES[b.phase], '第 ' + b.turn + ' 回合', color);
+      for (const m of (b.phaseMsgs || []).filter((m) => m.text || m.heal)) {
+        const mu = B.byUid(b, m.uid);
+        if (!mu || !visible(mu)) continue;
+        fx(mu.x, mu.y, m.text || '+' + m.heal, m.heal ? '#5ae07a' : m.dmg ? '#9be15a' : '#9fb4ff');
+      }
+      if ((b.phaseMsgs || []).some((m) => m.text || m.heal)) { updateHud(); await UI.sleep(500); }
       const amb = (b.phaseMsgs || []).filter((m) => m.ambush).map((m) => B.byUid(b, m.uid)).filter((u) => u && visible(u));
       if (amb.length) {
         UI.sfx('spirit');
@@ -367,7 +379,8 @@
         if (visible(u)) { fx(u.x, u.y, '逃走！', '#ffd24a'); await UI.sleep(400); }
         B.escape(b, u);
         UI.toast(u.name + ' 逃走了' + ((u.items || []).length ? '（帶走了 ' + u.items.map((it) => (G.campaign.items[it.id] || {}).name || it.id).join('、') + '）' : ''));
-      } else if (plan.map) await doMapAttack(u, plan.map.weapon, plan.map.at);
+      } else if (plan.ability) await doAbility(u, plan.ability.id, plan.ability.at);
+      else if (plan.map) await doMapAttack(u, plan.map.weapon, plan.map.at);
       else if (t && t.hp > 0) await doAttack(u, t);
       else if (plan.heal) await doHeal(u, B.byUid(b, plan.heal));
       else if (plan.item != null) await doItem(u, plan.item);
@@ -386,6 +399,11 @@
       if (pu && pu.hp > 0) fx(pu.x, pu.y - 0.4, '+' + e + ' EXP', '#8fb4ff');
     }
     for (const [uid, ups] of Object.entries(res.levelUps)) for (const g of ups) await UI.levelUp(B.byUid(b, +uid), g);
+    for (const [uid, names] of Object.entries(res.learned || {})) {
+      const lu = B.byUid(b, +uid);
+      UI.sfx('levelup');
+      await UI.banner('學會技能', (lu ? lu.name + '：' : '') + names.join('、'), '#ffe6a8', 1100);
+    }
   }
 
   async function doHeal(u, t) {
@@ -498,6 +516,54 @@
     for (const v of victims) v.hp = finals.get(v.uid);
     for (const d of res.deaths) { G.fx.push({ dying: true, unit: d, t0: performance.now() }); fx(d.x, d.y, '擊破', '#ffffff'); }
     if (res.deaths.length) await UI.sleep(500);
+    await showGains(res);
+    updateHud();
+  }
+
+  // 主動技能：演出 → 範圍特效 → 逐一顯示結果
+  async function doAbility(u, id, at) {
+    const b = G.battle;
+    const AB = SRPG.ability;
+    const ab = AB.abilityDef(b, id);
+    const tiles = AB.area(b, u, ab, at);
+    const vs = AB.victims(b, u, ab, tiles);
+    const before = new Map(vs.map((v) => [v.uid, { hp: v.hp, x: v.x, y: v.y }]));
+    const selfHp = u.hp;
+    const res = AB.use(b, u, id, at);
+    if (!res) return B.wait(b, u);
+    const after = new Map(vs.map((v) => [v.uid, { hp: v.hp, x: v.x, y: v.y }]));
+    const finalSelf = u.hp;
+    for (const v of vs) { const o = before.get(v.uid); v.hp = o.hp; v.x = o.x; v.y = o.y; }
+    u.hp = selfHp;
+    if (!G.vis || visible(u)) {
+      if (ab.anim && SET.get('scene') !== 'off') await SRPG.scene.overlay({ campaign: G.campaign, anim: ab.anim, unit: u, weaponName: ab.name, speed: speed() });
+      else { fx(u.x, u.y - 0.6, ab.name, '#ffe6a8'); await UI.sleep(250 / speed()); }
+    }
+    UI.sfx({ fire: 'magic', thunder: 'thunder', heal: 'heal', holy: 'heal', buff: 'spirit', slash: 'swing', wind: 'swing', earth: 'hit' }[ab.fx] || 'magic');
+    G.areaFx = (G.areaFx || []).concat({ tiles, kind: ab.fx || 'slash', color: ab.color || '#ffffff', t0: performance.now(), ms: 900 / speed() });
+    await UI.sleep(500 / speed());
+    for (const r of res.results) {
+      const tg = B.byUid(b, r.target);
+      const fin = after.get(tg.uid);
+      tg.hp = fin.hp;
+      if (r.evaded) fx(tg.x, tg.y, '閃避！', '#ff9ae8');
+      else if (!r.hit) fx(tg.x, tg.y, 'MISS', '#cfd6e0');
+      else if (r.dmg) { UI.sfx(r.crit ? 'crit' : 'hit'); fx(tg.x, tg.y, (r.crit ? '必殺！' : '') + '-' + r.dmg, r.crit ? '#ffd24a' : '#ff6464'); }
+      if (r.heal) fx(tg.x, tg.y, '+' + r.heal, '#5ae07a');
+      if (r.effects.length) fx(tg.x, tg.y - 0.55, r.effects.join(' '), '#c9b3ff');
+      if (fin.x !== tg.x || fin.y !== tg.y) {
+        const path = [{ x: tg.x, y: tg.y }, { x: fin.x, y: fin.y }];
+        tg.x = fin.x; tg.y = fin.y;
+        await animateMove(tg, path);
+      }
+      updateCards();
+      await UI.sleep(200 / speed());
+    }
+    u.hp = finalSelf;
+    if (res.results.some((r) => r.drain)) fx(u.x, u.y, '+' + res.results.reduce((a, r) => a + (r.drain || 0), 0), '#5ae07a');
+    for (const d of res.deaths) { G.fx.push({ dying: true, unit: d, t0: performance.now() }); fx(d.x, d.y, '擊破', '#ffffff'); }
+    if (res.deaths.length) { UI.sfx('death'); await UI.sleep(500); }
+    await showLoot(u, res);
     await showGains(res);
     updateHud();
   }
@@ -785,6 +851,22 @@
         const c = B.drop(b, me, t.x, t.y);
         if (c) fx(c.x, c.y, '放下', '#8fb4ff');
         await UI.sleep(300);
+      } else if (G.targetKind === 'ability') {
+        const AB = SRPG.ability;
+        const ab = G.ab;
+        const pv = AB.preview(b, me, ab, t);
+        const seen = pv.targets.filter((x) => visible(x.unit));
+        const foes = seen.filter((x) => !R.friendly(x.unit.team, me.team)), allies = seen.length - foes.length;
+        const first = foes.find((x) => x.strike) || seen[0];
+        const est = first && first.strike ? ` · ${first.unit.name} 傷害${first.strike.dmg} 命中${first.strike.hit}%` : first && first.heal ? ` · 回復 ${first.heal}` : '';
+        const pos = screenPosOfTile(t.x, t.y);
+        const go = await UI.menu([{ id: 'go', name: `發動 ${ab.name}`, note: (foes.length ? `敵 ${foes.length}` : '') + (allies ? ` 友 ${allies}` : '') + est }, { id: 'no', name: '取消' }], pos.x, pos.y);
+        if (go !== 'go') {
+          if (G.targets.length === 1 && G.targets[0].x === me.x && G.targets[0].y === me.y && (ab.range || [1, 1])[1] === 0) { G.targets = null; G.targetKind = null; return actionMenu(me); }
+          G.mode = 'target'; return;
+        }
+        G.targets = null;
+        await doAbility(me, ab.id, t);
       } else if (G.targetKind === 'map') {
         const area = R.mapArea(b, me, G.mapW.w, t);
         const vs = R.mapVictims(b, me, G.mapW.w, area).filter(visible);
@@ -837,6 +919,21 @@
         G.mapW = pickW;
         const shape = pickW.w.map.shape === 'line' ? '選擇方向' : '選擇中心點';
         return pickTarget('map', R.mapCenters(b, me, pickW.w), `${pickW.w.name}：${shape}（橘色為影響範圍，Esc 或 ✕ 取消）`);
+      }
+      case 'ability': {
+        const AB = SRPG.ability;
+        const list = AB.listFor(b, me).map((ab) => ({ id: ab.id, name: '✦ ' + ab.name, icon: ab.icon, note: UI.abilityNote(b, ab) + (ab.blocked ? ' · ' + ab.blocked : ''), title: ab.desc || '', disabled: !!ab.blocked }));
+        const aid = await menuAt(list);
+        if (aid == null) return actionMenu(me);
+        const ab = AB.abilityDef(b, aid);
+        G.ab = ab;
+        const cs = AB.centers(b, me, ab).filter((p) => AB.victims(b, me, ab, AB.area(b, me, ab, p)).length);
+        if (cs.length === 1 && (ab.target === 'self' || (ab.area || {}).shape === 'all' || ((ab.range || [1, 1])[1] === 0))) {
+          G.targets = cs; G.targetKind = 'ability'; G.mode = 'target'; setCursor(cs[0].x, cs[0].y);
+          return select(cs[0].x, cs[0].y);
+        }
+        const dir = AB.DIRECTIONAL[(ab.area || {}).shape];
+        return pickTarget('ability', cs, `${ab.name}：${dir ? '選擇方向' : '選擇施放位置'}（範圍會亮起，Esc 或 ✕ 取消）`);
       }
       case 'rescue': return pickTarget('rescue', B.rescueTargets(b, me), '選擇要救出的同伴（Esc 或 ✕ 取消）');
       case 'drop': return pickTarget('drop', B.dropTiles(b, me), '選擇放下的位置（Esc 或 ✕ 取消）');

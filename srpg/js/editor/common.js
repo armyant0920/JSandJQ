@@ -136,6 +136,13 @@
         for (const g of ['units', 'classes']) for (const u of Object.values(c[g])) if (u.skills) u.skills = u.skills.map((w) => (w === a ? b : w));
         eachScriptCmd((cmd) => { if (cmd.cmd === 'learn') swap(cmd, 'skill'); });
         break;
+      case 'abilities':
+        for (const g of ['units', 'classes']) for (const u of Object.values(c[g])) {
+          if (u.abilities) u.abilities = u.abilities.map((w) => (w === a ? b : w));
+          (u.learn || []).forEach((l) => swap(l, 'ability'));
+          (u.promote || []).forEach((p) => { if (p.abilities) p.abilities = p.abilities.map((w) => (w === a ? b : w)); });
+        }
+        break;
       case 'sprites': for (const g of ['classes', 'units', 'terrains']) for (const x of Object.values(c[g])) swap(x, 'sprite'); break;
       case 'portraits': for (const u of Object.values(c.units)) swap(u, 'portrait'); eachScriptCmd((cmd) => swap(cmd, 'portrait')); break;
       case 'scripts':

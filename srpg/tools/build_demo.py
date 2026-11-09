@@ -46,6 +46,12 @@ C={
  "shadow_wave":{"name":"暗影潮","type":"dark","dmg":"mag","mt":5,"hit":75,"morale":115,"crit":0,"range":[1,3],"map":{"shape":"burst","size":1},"cost":8,"icon":264,"desc":"地圖兵器"},
  "physic":{"name":"遠距治療杖","type":"staff","dmg":"mag","heal":8,"range":[1,3],"icon":281,"cost":5,"price":1500}
 },
+"abilities":{
+ "dawn_strike":{"name":"晨星斬","desc":"直線 3 格的光之斬擊（氣力 110）","target":"enemy","range":[1,1],"area":{"shape":"line","size":3},"power":8,"dmg":"phys","hit":90,"crit":10,"cost":6,"morale":110,"cooldown":2,"fx":"holy","color":"#fff3a0","anim":"special_meteor"},
+ "pin_shot":{"name":"麻痺箭","desc":"射擊並使目標緩速（移動 -2）","target":"enemy","range":[2,3],"area":{"shape":"single"},"power":3,"dmg":"phys","hit":90,"cost":3,"fx":"slash","color":"#7ad7ff","effects":[{"status":"slow","chance":100,"turns":2}]},
+ "smoke":{"name":"煙幕","desc":"周圍同伴迴避 +20（1 回合）","target":"ally","range":[0,0],"area":{"shape":"burst","size":1},"cost":3,"cooldown":2,"fx":"wind","color":"#cfcfcf","effects":[{"stat":"avo","value":20,"turns":1}]},
+ "dive":{"name":"俯衝","desc":"從空中直線衝下，貫穿 2 格","target":"enemy","range":[1,1],"area":{"shape":"line","size":2},"power":4,"dmg":"phys","hit":85,"cost":3,"fx":"wind","color":"#b8ffd8"}
+},
 "items":{
  "master_seal":{"name":"騎士勳章","kind":"promote","uses":1,"icon":175,"price":2500,"desc":"Lv5 以上可轉職為上級職業"},
  "ether":{"name":"魔力水","kind":"mp","power":10,"uses":2,"icon":218,"price":500,"desc":"回復 10 MP"},
@@ -76,28 +82,28 @@ C={
  "cleric":{"name":"僧侶","move":5,"moveType":"foot","sprite":"mage","promote":[{"to":"bishop","level":5,"item":"master_seal","bonus":{"hp":3,"mag":2,"def":1,"res":3,"mp":10},"weapons":["physic"]}]}
 },
 "units":{
- "alan":u("艾倫","lord",1,[20,6,1,7,8,6,5,2],[80,45,5,50,55,50,30,25],["iron_sword","meteor"],lord=True,sprite="chara_5",items=["vulnerary"],sp=40,spirits=["strike","valor","guts"],st=20,skills=["vigilant"]),
- "mira":u("米菈","cavalier",2,[22,7,0,5,6,4,6,1],[85,45,0,40,40,35,30,15],["iron_lance","javelin"],sprite="chara_6",items=["vulnerary"],sp=35,spirits=["accel","iron_wall","strike"],st=18,skills=["charge"]),
- "rook":u("魯克","archer",2,[18,6,0,8,6,3,4,1],[70,40,0,55,45,30,20,15],["iron_bow"],sprite="chara_3",sp=30,spirits=["focus","strike","effort"],st=15,skills=["keen"]),
- "elle":u("艾兒","mage",1,[16,0,7,6,7,5,2,6],[55,0,60,45,50,40,15,40],["fire","firestorm"],sprite="chara_4",items=["sp_potion"],sp=35,spirits=["valor","alert","effort"],mp=24,st=8),
- "lina":u("莉娜","cleric",1,[16,0,5,4,6,8,1,7],[50,0,50,35,45,60,10,50],["heal_staff"],sprite="chara_0",items=["vulnerary","elixir"],sp=50,spirits=["trust","cheer","alert"],mp=30,st=8),
- "kit":u("基特","thief",3,[17,4,0,9,12,7,3,1],[60,30,5,45,65,50,15,15],["slim_sword"],sprite="chara_1",items=["vulnerary"],sp=30,spirits=["alert","accel","focus"],st=20,skills=["adept"]),
- "sera":u("瑟拉","pegasus",4,[19,6,2,9,12,8,5,7],[60,40,15,50,60,45,20,40],["iron_lance","javelin"],sprite="chara_7",sp=40,spirits=["accel","alert","strike"],st=18),
+ "alan":u("艾倫","lord",1,[20,6,1,7,8,6,5,2],[80,45,5,50,55,50,30,25],["iron_sword","meteor"],lord=True,sprite="chara_5",items=["vulnerary"],sp=40,spirits=["strike","valor","guts"],st=20,skills=["vigilant"],abilities=["whirlwind"],learn=[{"level":3,"ability":"war_cry"},{"level":6,"ability":"dawn_strike"}]),
+ "mira":u("米菈","cavalier",2,[22,7,0,5,6,4,6,1],[85,45,0,40,40,35,30,15],["iron_lance","javelin"],sprite="chara_6",items=["vulnerary"],sp=35,spirits=["accel","iron_wall","strike"],st=18,skills=["charge"],abilities=["pierce"],learn=[{"level":4,"ability":"shield_bash"}]),
+ "rook":u("魯克","archer",2,[18,6,0,8,6,3,4,1],[70,40,0,55,45,30,20,15],["iron_bow"],sprite="chara_3",sp=30,spirits=["focus","strike","effort"],st=15,skills=["keen"],abilities=["arrow_rain"],learn=[{"level":4,"ability":"pin_shot"}]),
+ "elle":u("艾兒","mage",1,[16,0,7,6,7,5,2,6],[55,0,60,45,50,40,15,40],["fire","firestorm"],sprite="chara_4",items=["sp_potion"],sp=35,spirits=["valor","alert","effort"],mp=24,st=8,abilities=["fireball"],learn=[{"level":3,"ability":"ice_lance"},{"level":5,"ability":"thunder_cross"}]),
+ "lina":u("莉娜","cleric",1,[16,0,5,4,6,8,1,7],[50,0,50,35,45,60,10,50],["heal_staff"],sprite="chara_0",items=["vulnerary","elixir"],sp=50,spirits=["trust","cheer","alert"],mp=30,st=8,abilities=["heal_circle"],learn=[{"level":3,"ability":"purify"},{"level":4,"ability":"holy_shield"},{"level":6,"ability":"regen_aura"}]),
+ "kit":u("基特","thief",3,[17,4,0,9,12,7,3,1],[60,30,5,45,65,50,15,15],["slim_sword"],sprite="chara_1",items=["vulnerary"],sp=30,spirits=["alert","accel","focus"],st=20,skills=["adept"],abilities=["poison_blade"],learn=[{"level":5,"ability":"smoke"}]),
+ "sera":u("瑟拉","pegasus",4,[19,6,2,9,12,8,5,7],[60,40,15,50,60,45,20,40],["iron_lance","javelin"],sprite="chara_7",sp=40,spirits=["accel","alert","strike"],st=18,abilities=["dive","haste"]),
  "bandit":u("山賊","brigand",2,[22,6,0,2,4,0,3,0],None,["iron_axe"]),
  "pilferer":u("小偷","thief",2,[16,3,0,6,9,3,2,0],None,["slim_sword"],items=["elixir"],sprite="chara_1"),
  "bandit_axe":u("山賊","brigand",3,[23,6,0,2,4,0,3,0],None,["hand_axe"],st=10),
- "garr":u("加爾","brigand",5,[28,9,0,5,5,2,5,1],None,["iron_axe","hand_axe"],items=["vulnerary"],st=15,skills=["vantage"],spirits=["valor"],sp=30),
+ "garr":u("加爾","brigand",5,[28,9,0,5,5,2,5,1],None,["iron_axe","hand_axe"],items=["vulnerary"],st=15,skills=["vantage"],spirits=["valor"],sp=30,abilities=["war_cry"]),
  "soldier":u("帝國兵","soldier",4,[20,5,0,5,5,2,5,1],None,["iron_lance"],st=6),
  "imp_archer":u("帝國弓兵","archer",4,[19,6,0,7,5,2,4,1],None,["iron_bow"]),
  "imp_knight":u("帝國重甲","knight",5,[26,8,0,4,2,1,11,0],None,["iron_lance"]),
- "imp_mage":u("帝國魔道士","mage",4,[17,0,6,5,6,2,2,5],None,["fire"],mp=12),
+ "imp_mage":u("帝國魔道士","mage",4,[17,0,6,5,6,2,2,5],None,["fire"],mp=12,abilities=["fireball"]),
  "imp_pegasus":u("帝國天馬","pegasus",6,[19,6,1,7,9,3,5,6],None,["iron_lance","javelin"],st=10),
  "imp_sniper":u("帝國狙擊手","sniper",3,[23,7,0,9,7,3,5,3],None,["long_bow"],st=12),
  "imp_paladin":u("帝國聖騎士","paladin",3,[28,9,0,7,7,3,9,4],None,["silver_lance","javelin"],st=14),
- "helga":u("闇術師赫爾加","sage",5,[28,0,11,9,8,4,6,9],None,["dark_flux","shadow_wave"],mp=40,skills=["vantage"],spirits=["focus","iron_wall"],sp=40,morale=110,sprite="mage"),
- "emperor":u("皇帝傑羅斯","high_lord",8,[36,12,3,10,9,6,10,6],None,["killing_edge","silver_lance"],st=40,skills=["sol"],spirits=["valor","strike"],sp=60,morale=110,items=["elixir"]),
- "imp_cleric":u("帝國僧侶","cleric",4,[17,0,5,4,5,3,2,6],None,["heal_staff"],mp=15),
- "voss":u("沃斯將軍","knight",7,[28,10,0,7,4,3,7,2],None,["iron_lance","javelin","quake_lance"],items=["elixir"],sprite="chara_2",st=30,skills=["luna","vigilant"],spirits=["valor","strike"],sp=40,morale=105)
+ "helga":u("闇術師赫爾加","sage",5,[28,0,11,9,8,4,6,9],None,["dark_flux","shadow_wave"],mp=40,skills=["vantage"],spirits=["focus","iron_wall"],sp=40,morale=110,sprite="mage",abilities=["sleep_mist","weaken"]),
+ "emperor":u("皇帝傑羅斯","high_lord",8,[36,12,3,10,9,6,10,6],None,["killing_edge","silver_lance"],st=40,skills=["sol"],spirits=["valor","strike"],sp=60,morale=110,items=["elixir"],abilities=["whirlwind"]),
+ "imp_cleric":u("帝國僧侶","cleric",4,[17,0,5,4,5,3,2,6],None,["heal_staff"],mp=15,abilities=["heal_circle"]),
+ "voss":u("沃斯將軍","knight",7,[28,10,0,7,4,3,7,2],None,["iron_lance","javelin","quake_lance"],items=["elixir"],sprite="chara_2",st=30,skills=["luna","vigilant"],abilities=["shield_bash"],spirits=["valor","strike"],sp=40,morale=105)
 },
 "sprites":sprites,
 "portraits":{},
@@ -392,6 +398,7 @@ C={
   {"cmd":"gold","add":1500},
   {"cmd":"narrate","text":"【精神指令】消耗 SP 發動「必中」「熱血」「加速」等效果。【氣力】戰鬥與擊破敵人會提升，氣力越高傷害越大；艾倫的「流星斬」需要氣力 115。"},
   {"cmd":"say","who":"rook","text":"看！有個小偷抱著村裡的萬靈藥往東南邊跑了！"},
+  {"cmd":"narrate","text":"【技能】行動選單的「技能」是有範圍的招式與魔法：選擇後地圖上會亮出作用範圍，不會被反擊。艾倫的旋風斬打周圍所有敵人、艾兒的火球術炸一片、莉娜的治癒之環一次治療多人。升級時還會學會新技能。"},
   {"cmd":"narrate","text":"【朝向】單位腳下的箭頭是面向；從側面、背面攻擊命中與傷害提升，行動選單可「轉向」。【突進】米菈直線衝刺 2 格以上、攻擊正前方的敵人會發動突進。【逃跑】小偷逃到地圖邊緣就會帶著道具消失，擊倒他可以取回。【回溯】選單「回到上一步」每章可用 3 次。"}],
  "ch1_kit":[
   {"cmd":"say","who":"kit","text":"……你們不是帝國的人？"},

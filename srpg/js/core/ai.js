@@ -86,6 +86,57 @@
     return best;
   }
 
+  /* 主動技能：評估每個可到達位置、每個施放點的效果分數 */
+  const STATUS_VALUE = { sleep: 10, stun: 9, poison: 4, slow: 3, silence: 4, regen: 5 };
+  function scoreAbility(b, u, ab, at) {
+    const A = SRPG.ability;
+    const foes = B.living(b).filter((o) => !R.friendly(o.team, u.team));
+    const threatened = (v) => foes.some((f) => dist(f, v) <= 6);
+    let sc = 0;
+    for (const v of A.victims(b, u, ab, A.area(b, u, ab, at))) {
+      const foe = !R.friendly(v.team, u.team);
+      const s = A.strikeInfo(b, u, ab, v);
+      let val = 0;
+      if (s) val += (Math.min(v.hp, s.dmg) * s.hit / 100) * 2 + (s.dmg >= v.hp ? 25 * s.hit / 100 : 0) + (v.lord ? 3 : 0);
+      if (ab.heal) val += Math.min(v.stats.hp - v.hp, A.healAmount(u, ab)) * 0.9;
+      const hitP = s ? s.hit / 100 : 1;
+      for (const e of ab.effects || []) {
+        if (e.status && R.STATUSES[e.status]) {
+          if (!(v.status || {})[e.status] && v.hp > (s ? s.dmg : 0)) val += (STATUS_VALUE[e.status] || 3) * A.statusChance(e, v) / 100 * hitP;
+        } else if (e.stat) {
+          if (!(v.mods || []).some((m) => m.stat === e.stat && Math.sign(m.value) === Math.sign(e.value))) val += Math.abs(e.value) * (threatened(v) ? 1 : 0.1);
+        } else if (e.cure) val += Object.keys(v.status || {}).filter((k) => (R.STATUSES[k] || {}).bad).length * 6 + (v.mods || []).filter((m) => m.value < 0).length * 2;
+        else if (e.push) val += 1;
+      }
+      sc += ab.target === 'any' && !foe && (s || (ab.effects || []).some((e) => e.status && R.STATUSES[e.status].bad)) ? -val * 2 : val;
+    }
+    return sc - (ab.cost || 0) * 0.2;
+  }
+  function planAbility(b, u, reach) {
+    const A = SRPG.ability;
+    if (!A || !(u.abilities || []).length) return null;
+    const list = A.listFor(b, u).filter((ab) => !A.blockReason(b, u, ab, true));
+    if (!list.length) return null;
+    const perTile = [];
+    const ox = u.x, oy = u.y;
+    for (const n of reach.values()) {
+      if (!n.stop) continue;
+      u.x = n.x; u.y = n.y;
+      let best = null;
+      for (const ab of list) for (const at of A.centers(b, u, ab)) {
+        const sc = scoreAbility(b, u, ab, at) - n.cost * 0.01;
+        if (sc > 3 && (!best || sc > best.score)) best = { x: n.x, y: n.y, ability: { id: ab.id, at }, score: sc };
+      }
+      if (best) perTile.push(best);
+    }
+    u.x = ox; u.y = oy;
+    perTile.sort((a, z) => z.score - a.score);
+    if (u.ai !== 'cautious') return perTile[0] || null;
+    // 慎重：只在不會被圍攻致死的位置施放
+    for (const p of perTile.slice(0, 6)) if (dangerAt(b, u, p) < u.hp * 0.6) return p;
+    return null;
+  }
+
   /* 敵方精神指令：依計畫決定要用哪些（回傳精神指令 id 陣列，尚未施放） */
   function pickSpirits(b, u, p) {
     if (!R.rulesOf(b).spirits || !(u.spirits || []).length) return [];
@@ -153,12 +204,16 @@
           const kills = fc.att && fc.att.dmg * fc.att.strikes >= t.hp && fc.att.hit >= 70;
           const back = fc.def ? fc.def.dmg * fc.def.strikes : 0;
           if (back >= u.hp) continue;
-          if (!kills && back + dangerAt(b, u, n) >= u.hp * 0.6) continue;
+          const danger = back + dangerAt(b, u, n);
+          if (!kills && danger >= u.hp * 0.6) continue;
+          if (u.lord && danger >= u.hp) continue;   // 主角：就算能擊倒也不站進會被打死的位置
         }
         const sc = s - n.cost * 0.01; // 同分時少走一點
         if (!best || sc > best.score) best = { x: n.x, y: n.y, target: t.uid, score: sc };
       }
     }
+    const ap = planAbility(b, u, reach);
+    if (ap && (!best || ap.score > best.score * 0.9)) return ap;
     const mp = planMap(b, u, reach);
     if (mp && (!best || mp.score > best.score * 0.8)) return mp;
     if (best) return best;
@@ -197,6 +252,6 @@
     return { x: dest.x, y: dest.y, target: null };
   }
 
-  SRPG.ai = { plan, planFlee, scoreAttack, planMap, pickSpirits, dangerAt };
+  SRPG.ai = { plan, planFlee, planAbility, scoreAbility, scoreAttack, planMap, pickSpirits, dangerAt };
   if (typeof module !== 'undefined' && module.exports) module.exports = SRPG;
 })(typeof window !== 'undefined' ? window : globalThis);
