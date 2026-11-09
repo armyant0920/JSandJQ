@@ -53,6 +53,8 @@
     luna:    { name: '月光', effect: 'luna', rate: 'skl', rateMul: 0.5, desc: '技巧/2% 機率無視防禦' },
     keen:    { name: '銳眼', effect: 'bonus', hit: 15, crit: 10, desc: '命中 +15、必殺 +10' },
     guard:   { name: '堅守', effect: 'bonus', avo: 10, block: 2, desc: '迴避 +10、受到傷害 -2' },
+    charge:  { name: '突進', effect: 'charge', desc: '直線移動後攻擊正前方的敵人，傷害與命中提升（需開啟突進規則）' },
+    vigilant:{ name: '警覺', effect: 'vigilant', desc: '不會被側擊或背擊' },
   };
 
   function normalize(raw) {
@@ -161,7 +163,13 @@
       }
       return out;
     });
-    return { w, h, tiles };
+    // 高度層（選用）：與 rows 同尺寸的數字列 0–9，缺少的格子視為 0
+    const hr = Array.isArray(map.heights) ? map.heights : [];
+    const heights = tiles.map((row, y) => row.map((_, x) => {
+      const ch = (hr[y] || '')[x];
+      return ch >= '0' && ch <= '9' ? +ch : 0;
+    }));
+    return { w, h, tiles, heights };
   }
 
   function defaultLegend(c) {
@@ -194,14 +202,16 @@
       move: cls.move || 5, moveType: cls.moveType || 'foot', tags: clone(cls.tags || []),
       sprite: def.sprite || cls.sprite || null, portrait: def.portrait || null,
       wup: clone((saved && saved.wup) || {}), upg: clone((saved && saved.upg) || {}),
-      ai: place.ai || 'aggressive', boss: !!place.boss, lord: !!(def.lord || place.lord),
+      ai: place.ai || 'aggressive', boss: !!place.boss,
+      ...(place.group ? { group: place.group } : {}), ...(place.zone ? { zone: clone(place.zone) } : {}),
+      ...(place.trigger ? { trigger: place.trigger } : {}), ...(place.escape ? { escape: clone(place.escape) } : {}), lord: !!(def.lord || place.lord),
       items, spirits: clone(def.spirits || cls.spirits || []),
       skills: [...new Set([].concat(cls.skills || [], def.skills || [], (saved && saved.skills) || []))],
       sp: def.sp || 0, maxSp: def.sp || 0,
       mp: def.mp != null ? def.mp : (cls.mp || 0), maxMp: def.mp != null ? def.mp : (cls.mp || 0),
       st: def.st != null ? def.st : (cls.st || 0), maxSt: def.st != null ? def.st : (cls.st || 0),
       vision: def.vision || cls.vision || 3, moveUsed: 0,
-      morale: def.morale || rules.moraleStart, buffs: {}, dir: place.team === 'enemy' ? 1 : 2,
+      morale: def.morale || rules.moraleStart, buffs: {}, dir: place.dir != null ? place.dir : (place.team === 'enemy' ? 1 : 2),
       acted: false, moved: false,
     };
   }

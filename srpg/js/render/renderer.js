@@ -97,6 +97,30 @@
     ctx.lineWidth = 1;
     for (let x = 0; x <= map.w; x++) { ctx.beginPath(); ctx.moveTo(x * TS + 0.5, 0); ctx.lineTo(x * TS + 0.5, map.h * TS); ctx.stroke(); }
     for (let y = 0; y <= map.h; y++) { ctx.beginPath(); ctx.moveTo(0, y * TS + 0.5); ctx.lineTo(map.w * TS, y * TS + 0.5); ctx.stroke(); }
+    drawHeights(ctx, map);
+  }
+
+  // 高度層：越高越亮、高低交界畫崖邊陰影、左上角標示高度
+  function drawHeights(ctx, map) {
+    const H = map.heights;
+    if (!H || !H.some((row) => row.some((v) => v))) return;
+    const at = (x, y) => (H[y] && H[y][x] != null ? H[y][x] : null);
+    for (let y = 0; y < map.h; y++) for (let x = 0; x < map.w; x++) {
+      const v = at(x, y), px = x * TS, py = y * TS;
+      if (v) { ctx.fillStyle = `rgba(255,255,255,${Math.min(0.3, v * 0.07)})`; ctx.fillRect(px, py, TS, TS); }
+      // 比鄰格高 → 在鄰格那一側畫陰影（下方、右方較明顯）
+      for (const [dx, dy, x0, y0, w, h] of [[0, 1, 0, TS - 5, TS, 5], [1, 0, TS - 4, 0, 4, TS], [0, -1, 0, 0, TS, 2], [-1, 0, 0, 0, 3, TS]]) {
+        const n = at(x + dx, y + dy);
+        if (n == null || n >= v) continue;
+        ctx.fillStyle = `rgba(20,12,4,${Math.min(0.6, 0.22 * (v - n))})`;
+        ctx.fillRect(px + x0, py + y0, w, h);
+      }
+      if (v) {
+        ctx.font = 'bold 10px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+        ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(0,0,0,0.65)'; ctx.strokeText('▲' + v, px + 2, py + 2);
+        ctx.fillStyle = '#ffe9a8'; ctx.fillText('▲' + v, px + 2, py + 2);
+      }
+    }
   }
 
   function spriteFor(campaign, u) {
@@ -104,7 +128,7 @@
     return id ? campaign.sprites[id] : null;
   }
 
-  // 畫單位（px,py 為像素座標）。opts: { gray, still, hp, dir }
+  // 畫單位（px,py 為像素座標）。opts: { gray, still, hp, dir, facing(顯示朝向箭頭) }
   function drawUnit(ctx, campaign, u, px, py, t, opts) {
     opts = opts || {};
     const sp = spriteFor(campaign, u);
@@ -121,7 +145,18 @@
     ctx.beginPath(); ctx.ellipse(px + TS / 2, py + TS - 7, TS * 0.34, 6, 0, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = tc.team; ctx.lineWidth = 2.5;
     ctx.beginPath(); ctx.ellipse(px + TS / 2, py + TS - 7, TS * 0.34, 6, 0, 0, Math.PI * 2); ctx.stroke();
-    const flip = !isImg && u.team === 'enemy';
+    // 朝向開啟時，ASCII 精靈依左右朝向翻轉（行走圖本身有四方向）
+    const flip = !isImg && (opts.facing && (u.dir === 1 || u.dir === 2) ? u.dir === 1 : u.team === 'enemy');
+    if (opts.facing && u.dir != null) {
+      const [fx, fy] = [[0, 1], [-1, 0], [1, 0], [0, -1]][u.dir] || [0, 1];
+      const cx = px + TS / 2 + fx * TS * 0.36, cy = py + TS - 7 + fy * 7;
+      ctx.fillStyle = tc.teamLight || tc.team; ctx.strokeStyle = 'rgba(0,0,0,0.7)'; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(cx + fx * 6, cy + fy * 5);
+      ctx.lineTo(cx - fy * 5 - fx * 1, cy + fx * 4 - fy * 1);
+      ctx.lineTo(cx + fy * 5 - fx * 1, cy - fx * 4 - fy * 1);
+      ctx.closePath(); ctx.fill(); ctx.stroke();
+    }
     const s = TS - 4;
     ctx.translate(px + TS / 2, py + 1 + bob);
     if (flip) ctx.scale(-1, 1);
@@ -196,5 +231,5 @@
     }
   }
 
-  SRPG.renderer = { TS, drawTerrain, drawMap, drawUnit, spriteFor, tint, drawCursor, drawPath, drawFx };
+  SRPG.renderer = { TS, drawTerrain, drawMap, drawHeights, drawUnit, spriteFor, tint, drawCursor, drawPath, drawFx };
 })(typeof window !== 'undefined' ? window : globalThis);

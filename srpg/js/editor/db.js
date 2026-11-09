@@ -2,6 +2,8 @@
 (function () {
   'use strict';
   const { h } = ED;
+  // 勾選後重新繪製（顯示/隱藏相關設定）
+  const chkR = (obj, key, label) => h('label', {}, h('input', { type: 'checkbox', checked: !!obj[key], onchange: (e) => { if (e.target.checked) obj[key] = true; else delete obj[key]; ED.dirty(true); } }), ' ' + label);
   const C = SRPG.campaign;
   const MOVE_TYPES = [['foot', '步行'], ['horse', '騎馬'], ['armor', '重甲'], ['fly', '飛行']];
   const WTYPES = [['sword', '劍'], ['lance', '槍'], ['axe', '斧'], ['bow', '弓'], ['anima', '理魔法'], ['light', '光魔法'], ['dark', '闇魔法'], ['staff', '杖（治療）'], ['other', '其他']];
@@ -64,6 +66,15 @@
         ...ED.formRow('體力 / 法力', ED.check(m.rules, 'resources', '武器與杖可設定消耗體力或法力；每回合回復、待機可喘息')),
         ...ED.formRow('改造', ED.check(m.rules, 'upgrades', 'SRW 風格：出擊準備畫面花軍資金強化武器與能力'), '上限', ED.num(m.rules, 'upgradeMax', { attrs: { placeholder: '5' } })),
         ...ED.formRow('轉職', h('label', {}, h('input', { type: 'checkbox', checked: m.rules.promoteReset !== false, onchange: (e) => { if (e.target.checked) delete m.rules.promoteReset; else m.rules.promoteReset = false; ED.dirty(); } }), ' 轉職後等級回到 1（FE 風格）')),
+        ...ED.formRow('單位朝向', chkR(m.rules, 'facing', '神奇傳說風格：從側面/背面攻擊有加成，行動選單可「轉向」')),
+        ...(m.rules.facing ? ED.formRow('朝向加成', '側擊 命中', ED.num(m.rules, 'sideHit', { attrs: { placeholder: '10' } }), '背擊 命中', ED.num(m.rules, 'backHit', { attrs: { placeholder: '20' } }),
+          '必殺', ED.num(m.rules, 'backCrit', { attrs: { placeholder: '0' } }), '傷害', ED.num(m.rules, 'backDmg', { attrs: { placeholder: '2' } })) : []),
+        ...ED.formRow('突進', chkR(m.rules, 'charge', '直線移動後攻擊正前方的敵人有加成（武器勾「突進」或有突進技能）')),
+        ...(m.rules.charge ? ED.formRow('突進設定', '最少直線格數', ED.num(m.rules, 'chargeMin', { attrs: { placeholder: '2' } }), '傷害 +', ED.num(m.rules, 'chargeDmg', { attrs: { placeholder: '3' } }), '命中 +', ED.num(m.rules, 'chargeHit', { attrs: { placeholder: '10' } })) : []),
+        ...ED.formRow('高低差', chkR(m.rules, 'height', '近戰從高處攻擊有加成、低處有減益（飛行無視）；地圖用「⛰ 高度」筆刷')),
+        ...(m.rules.height ? ED.formRow('高低差設定', '每層命中', ED.num(m.rules, 'heightHit', { attrs: { placeholder: '10' } }), '每層傷害', ED.num(m.rules, 'heightDmg', { attrs: { placeholder: '1' } }),
+          '最多計算', ED.num(m.rules, 'heightMax', { attrs: { placeholder: '2' } }), '層；爬坡上限', ED.num(m.rules, 'heightClimb', { attrs: { placeholder: '0 = 不限' } })) : []),
+        ...ED.formRow('回溯', ED.num(m.rules, 'rewind', { attrs: { placeholder: '0' } }), h('span.hint', {}, '每章可「回到上一步」的次數；0 關閉、-1 無限。亂數也會還原，重做同一個行動結果相同')),
         ...(m.rules.resources ? ED.formRow('回復量', '體力/回合', ED.num(m.rules, 'stRegen', { attrs: { placeholder: '3' } }), '法力/回合', ED.num(m.rules, 'mpRegen', { attrs: { placeholder: '2' } }), '待機喘息', ED.num(m.rules, 'restSt', { attrs: { placeholder: '3' } })) : [])),
       h('p.hint', {}, counts),
       h('h2', {}, '使用說明'),
@@ -165,6 +176,7 @@
           h('button', { onclick: () => { ED.sel.animations = SRPG.media.animFor(ED.c, w); ED.tab = 'animations'; ED.render(); } }, '✎ 編輯演出')),
         ...(w.type === 'staff' ? ED.formRow('回復量', ED.num(w, 'heal'), h('span.hint', {}, '實際回復 = 魔力 + 回復量')) : []),
         ...ED.formRow('勇者武器', ED.check(w, 'brave', '每次攻擊連續兩下')),
+        ...ED.formRow('突進', ED.check(w, 'charge', '直線移動後近戰攻擊有加成（需開啟突進規則）')),
         ...ED.formRow('氣力需求', ED.num(w, 'morale', { attrs: { placeholder: '無' } }), h('span.hint', {}, '氣力系統開啟時，氣力不足無法使用（必殺技）')),
         ...ED.formRow('消耗', ED.num(w, 'cost', { attrs: { placeholder: '0' } }), ED.select(w, 'costType', [['st', '體力'], ['mp', '法力']], { optional: true, optionalLabel: '（自動：魔法/杖用法力）' }), h('span.hint', {}, '資源系統開啟時使用；反擊也會消耗')),
         ...ED.formRow('地圖兵器', h('label', {}, h('input', { type: 'checkbox', checked: !!w.map, onchange: (e) => { if (e.target.checked) w.map = { shape: 'burst', size: 1 }; else delete w.map; ED.dirty(true); } }), ' 範圍攻擊（不會反擊、不能用來反擊）'),

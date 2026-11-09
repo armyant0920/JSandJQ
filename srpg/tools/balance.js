@@ -59,10 +59,11 @@ function trySeize(b, u) {
   return true;
 }
 
-// 模擬玩家：主角、前兩回合與受傷的角色謹慎，其餘積極
+// 模擬玩家：前兩回合與受傷的角色謹慎、主角前 6 回合謹慎，其餘積極
+// （拖太久時全員進攻，避免「全員慎重 vs 原地不動的敵將」永遠僵持）
 function playerStyle(b, u) {
-  if (u.lord || u.hp < u.stats.hp * 0.4) return 'cautious';
-  if (b.turn <= 2) return 'cautious';
+  if (u.hp < u.stats.hp * 0.4) return 'cautious';
+  if (b.turn <= 2 || (u.lord && b.turn <= 6)) return 'cautious';
   return 'aggressive';
 }
 
@@ -77,7 +78,8 @@ function act(b, u, seed) {
   for (const sid of AI.pickSpirits(b, u, p)) B.useSpirit(b, u, sid);
   if (p.x !== u.x || p.y !== u.y) B.moveUnit(b, u, p.x, p.y);
   const t = p.target && B.byUid(b, p.target);
-  if (p.map) B.mapAttack(b, u, p.map.weapon, p.map.at);
+  if (p.escape) B.escape(b, u);
+  else if (p.map) B.mapAttack(b, u, p.map.weapon, p.map.at);
   else if (t && t.hp > 0) B.attack(b, u, t);
   else if (p.heal) B.heal(b, u, B.byUid(b, p.heal));
   else if (p.item != null) B.useItem(b, u, p.item);

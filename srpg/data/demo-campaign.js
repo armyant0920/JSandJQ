@@ -12,9 +12,13 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "morale": true,
    "spirits": true,
    "resources": true,
-   "upgrades": true
+   "upgrades": true,
+   "facing": true,
+   "charge": true,
+   "height": true,
+   "rewind": 3
   },
-  "desc": "內建示範：5 章、轉職與改造、劇情分歧、說服、拜訪、增援；杖、道具、交換、救出、再移動、被動技能、體力/法力、地圖兵器、支援對話、出擊準備與商店、霧戰、精神指令、氣力。"
+  "desc": "內建示範：5 章、單位朝向/背擊、突進、高低差、伏擊與逃跑的敵人、回溯、轉職與改造、劇情分歧、說服、拜訪、增援；杖、道具、交換、救出、再移動、被動技能、體力/法力、地圖兵器、支援對話、出擊準備與商店、霧戰、精神指令、氣力。"
  },
  "weapons": {
   "iron_sword": {
@@ -713,7 +717,10 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "valor",
     "guts"
    ],
-   "st": 20
+   "st": 20,
+   "skills": [
+    "vigilant"
+   ]
   },
   "mira": {
    "name": "米菈",
@@ -753,7 +760,10 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "iron_wall",
     "strike"
    ],
-   "st": 18
+   "st": 18,
+   "skills": [
+    "charge"
+   ]
   },
   "rook": {
    "name": "魯克",
@@ -972,6 +982,28 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "weapons": [
     "iron_axe"
    ]
+  },
+  "pilferer": {
+   "name": "小偷",
+   "class": "thief",
+   "level": 2,
+   "stats": {
+    "hp": 16,
+    "str": 3,
+    "mag": 0,
+    "skl": 6,
+    "spd": 9,
+    "lck": 3,
+    "def": 2,
+    "res": 0
+   },
+   "weapons": [
+    "slim_sword"
+   ],
+   "items": [
+    "elixir"
+   ],
+   "sprite": "chara_1"
   },
   "bandit_axe": {
    "name": "山賊",
@@ -1261,7 +1293,8 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    "sprite": "chara_2",
    "st": 30,
    "skills": [
-    "luna"
+    "luna",
+    "vigilant"
    ],
    "spirits": [
     "valor",
@@ -2222,6 +2255,17 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "y": 6,
      "ai": "hold",
      "boss": true
+    },
+    {
+     "unit": "pilferer",
+     "team": "enemy",
+     "x": 8,
+     "y": 8,
+     "ai": "flee",
+     "escape": {
+      "x": 15,
+      "y": 9
+     }
     }
    ],
    "victory": {
@@ -2263,6 +2307,11 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "on": "death",
      "unit": "garr",
      "script": "ch1_garr"
+    },
+    {
+     "on": "escape",
+     "unit": "pilferer",
+     "script": "ch1_thief_gone"
     },
     {
      "on": "victory",
@@ -2661,7 +2710,15 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "unit": "soldier",
      "team": "enemy",
      "x": 8,
-     "y": 6
+     "y": 7,
+     "ai": "ambush",
+     "group": "woods",
+     "zone": {
+      "x": 4,
+      "y": 5,
+      "w": 7,
+      "h": 3
+     }
     },
     {
      "unit": "imp_archer",
@@ -2715,6 +2772,10 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "script": "ch3_voss"
     },
     {
+     "on": "ambush",
+     "script": "ch3_ambush"
+    },
+    {
      "on": "victory",
      "script": "ch3_end"
     }
@@ -2765,6 +2826,15 @@ window.SRPG_DEFAULT_CAMPAIGN = {
      "M...F....F....MM",
      "MM......~~~..MMM",
      "MMMMM..~~~~MMMMM"
+    ],
+    "heights": [
+     "0000000022222200",
+     "0000000022222200",
+     "0000000022222200",
+     "0000000000000111",
+     "0000000000000111",
+     "0000000000000111",
+     "0000000000000111"
     ]
    },
    "units": [
@@ -3135,6 +3205,10 @@ window.SRPG_DEFAULT_CAMPAIGN = {
     "text": "帝國軍撤退到斷崖峽谷，闇術師赫爾加在此布陣。"
    },
    {
+    "cmd": "narrate",
+    "text": "【高低差】格子左上角的 ▲ 是高度。近戰從高處攻擊命中與傷害提升，從低處攻擊則會吃虧；弓箭、魔法與飛行單位不受影響。"
+   },
+   {
     "cmd": "say",
     "who": "mira",
     "text": "艾倫大人，這是在沃斯將軍營帳找到的騎士勳章。等級夠的人就能轉職成上級職業。"
@@ -3442,6 +3516,15 @@ window.SRPG_DEFAULT_CAMPAIGN = {
    {
     "cmd": "narrate",
     "text": "【精神指令】消耗 SP 發動「必中」「熱血」「加速」等效果。【氣力】戰鬥與擊破敵人會提升，氣力越高傷害越大；艾倫的「流星斬」需要氣力 115。"
+   },
+   {
+    "cmd": "say",
+    "who": "rook",
+    "text": "看！有個小偷抱著村裡的萬靈藥往東南邊跑了！"
+   },
+   {
+    "cmd": "narrate",
+    "text": "【朝向】單位腳下的箭頭是面向；從側面、背面攻擊命中與傷害提升，行動選單可「轉向」。【突進】米菈直線衝刺 2 格以上、攻擊正前方的敵人會發動突進。【逃跑】小偷逃到地圖邊緣就會帶著道具消失，擊倒他可以取回。【回溯】選單「回到上一步」每章可用 3 次。"
    }
   ],
   "ch1_kit": [
@@ -3571,6 +3654,26 @@ window.SRPG_DEFAULT_CAMPAIGN = {
       "ai": "aggressive"
      }
     ]
+   }
+  ],
+  "ch1_thief_gone": [
+   {
+    "cmd": "say",
+    "who": "alan",
+    "side": "right",
+    "text": "可惡，小偷帶著萬靈藥逃走了……"
+   }
+  ],
+  "ch3_ambush": [
+   {
+    "cmd": "say",
+    "who": "voss",
+    "text": "森林裡的伏兵，出擊！"
+   },
+   {
+    "cmd": "say",
+    "who": "mira",
+    "text": "艾倫大人，小心側面！"
    }
   ],
   "ch1_garr": [

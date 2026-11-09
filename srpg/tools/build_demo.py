@@ -22,8 +22,8 @@ def u(name,cls,lv,stats_,gr,wp,**kw):
 C={
 "format":"srpg-campaign","version":1,
 "meta":{"title":"邊境的晨星（示範劇本）","author":"SRPG Demo","start":"ch1","permadeath":True,
-        "rules":{"morale":True,"spirits":True,"resources":True,"upgrades":True},
-        "desc":"內建示範：5 章、轉職與改造、劇情分歧、說服、拜訪、增援；杖、道具、交換、救出、再移動、被動技能、體力/法力、地圖兵器、支援對話、出擊準備與商店、霧戰、精神指令、氣力。"},
+        "rules":{"morale":True,"spirits":True,"resources":True,"upgrades":True,"facing":True,"charge":True,"height":True,"rewind":3},
+        "desc":"內建示範：5 章、單位朝向/背擊、突進、高低差、伏擊與逃跑的敵人、回溯、轉職與改造、劇情分歧、說服、拜訪、增援；杖、道具、交換、救出、再移動、被動技能、體力/法力、地圖兵器、支援對話、出擊準備與商店、霧戰、精神指令、氣力。"},
 "weapons":{
  "iron_sword":{"name":"鐵劍","type":"sword","dmg":"phys","mt":5,"hit":90,"crit":0,"range":[1,1],"icon":296,"price":400},
  "slim_sword":{"name":"細劍","type":"sword","dmg":"phys","mt":3,"hit":100,"crit":5,"range":[1,1],"icon":287,"price":500},
@@ -76,14 +76,15 @@ C={
  "cleric":{"name":"僧侶","move":5,"moveType":"foot","sprite":"mage","promote":[{"to":"bishop","level":5,"item":"master_seal","bonus":{"hp":3,"mag":2,"def":1,"res":3,"mp":10},"weapons":["physic"]}]}
 },
 "units":{
- "alan":u("艾倫","lord",1,[20,6,1,7,8,6,5,2],[80,45,5,50,55,50,30,25],["iron_sword","meteor"],lord=True,sprite="chara_5",items=["vulnerary"],sp=40,spirits=["strike","valor","guts"],st=20),
- "mira":u("米菈","cavalier",2,[22,7,0,5,6,4,6,1],[85,45,0,40,40,35,30,15],["iron_lance","javelin"],sprite="chara_6",items=["vulnerary"],sp=35,spirits=["accel","iron_wall","strike"],st=18),
+ "alan":u("艾倫","lord",1,[20,6,1,7,8,6,5,2],[80,45,5,50,55,50,30,25],["iron_sword","meteor"],lord=True,sprite="chara_5",items=["vulnerary"],sp=40,spirits=["strike","valor","guts"],st=20,skills=["vigilant"]),
+ "mira":u("米菈","cavalier",2,[22,7,0,5,6,4,6,1],[85,45,0,40,40,35,30,15],["iron_lance","javelin"],sprite="chara_6",items=["vulnerary"],sp=35,spirits=["accel","iron_wall","strike"],st=18,skills=["charge"]),
  "rook":u("魯克","archer",2,[18,6,0,8,6,3,4,1],[70,40,0,55,45,30,20,15],["iron_bow"],sprite="chara_3",sp=30,spirits=["focus","strike","effort"],st=15,skills=["keen"]),
  "elle":u("艾兒","mage",1,[16,0,7,6,7,5,2,6],[55,0,60,45,50,40,15,40],["fire","firestorm"],sprite="chara_4",items=["sp_potion"],sp=35,spirits=["valor","alert","effort"],mp=24,st=8),
  "lina":u("莉娜","cleric",1,[16,0,5,4,6,8,1,7],[50,0,50,35,45,60,10,50],["heal_staff"],sprite="chara_0",items=["vulnerary","elixir"],sp=50,spirits=["trust","cheer","alert"],mp=30,st=8),
  "kit":u("基特","thief",3,[17,4,0,9,12,7,3,1],[60,30,5,45,65,50,15,15],["slim_sword"],sprite="chara_1",items=["vulnerary"],sp=30,spirits=["alert","accel","focus"],st=20,skills=["adept"]),
  "sera":u("瑟拉","pegasus",4,[19,6,2,9,12,8,5,7],[60,40,15,50,60,45,20,40],["iron_lance","javelin"],sprite="chara_7",sp=40,spirits=["accel","alert","strike"],st=18),
  "bandit":u("山賊","brigand",2,[22,6,0,2,4,0,3,0],None,["iron_axe"]),
+ "pilferer":u("小偷","thief",2,[16,3,0,6,9,3,2,0],None,["slim_sword"],items=["elixir"],sprite="chara_1"),
  "bandit_axe":u("山賊","brigand",3,[23,6,0,2,4,0,3,0],None,["hand_axe"],st=10),
  "garr":u("加爾","brigand",5,[28,9,0,5,5,2,5,1],None,["iron_axe","hand_axe"],items=["vulnerary"],st=15,skills=["vantage"],spirits=["valor"],sp=30),
  "soldier":u("帝國兵","soldier",4,[20,5,0,5,5,2,5,1],None,["iron_lance"],st=6),
@@ -96,7 +97,7 @@ C={
  "helga":u("闇術師赫爾加","sage",5,[28,0,11,9,8,4,6,9],None,["dark_flux","shadow_wave"],mp=40,skills=["vantage"],spirits=["focus","iron_wall"],sp=40,morale=110,sprite="mage"),
  "emperor":u("皇帝傑羅斯","high_lord",8,[36,12,3,10,9,6,10,6],None,["killing_edge","silver_lance"],st=40,skills=["sol"],spirits=["valor","strike"],sp=60,morale=110,items=["elixir"]),
  "imp_cleric":u("帝國僧侶","cleric",4,[17,0,5,4,5,3,2,6],None,["heal_staff"],mp=15),
- "voss":u("沃斯將軍","knight",7,[28,10,0,7,4,3,7,2],None,["iron_lance","javelin","quake_lance"],items=["elixir"],sprite="chara_2",st=30,skills=["luna"],spirits=["valor","strike"],sp=40,morale=105)
+ "voss":u("沃斯將軍","knight",7,[28,10,0,7,4,3,7,2],None,["iron_lance","javelin","quake_lance"],items=["elixir"],sprite="chara_2",st=30,skills=["luna","vigilant"],spirits=["valor","strike"],sp=40,morale=105)
 },
 "sprites":sprites,
 "portraits":{},
@@ -124,7 +125,8 @@ C={
    {"unit":"bandit","team":"enemy","x":11,"y":6,"ai":"aggressive"},
    {"unit":"bandit_axe","team":"enemy","x":12,"y":3,"ai":"guard"},
    {"unit":"kit","team":"enemy","x":6,"y":4,"ai":"guard"},
-   {"unit":"garr","team":"enemy","x":13,"y":6,"ai":"hold","boss":True}],
+   {"unit":"garr","team":"enemy","x":13,"y":6,"ai":"hold","boss":True},
+   {"unit":"pilferer","team":"enemy","x":8,"y":8,"ai":"flee","escape":{"x":15,"y":9}}],
   "victory":{"type":"boss"},"defeat":{"type":"lordDies"},
   "events":[
    {"on":"start","script":"ch1_intro"},
@@ -133,6 +135,7 @@ C={
    {"on":"visit","x":11,"y":8,"script":"ch1_village2"},
    {"on":"turn","turn":3,"phase":"enemy","script":"ch1_reinf"},
    {"on":"death","unit":"garr","script":"ch1_garr"},
+   {"on":"escape","unit":"pilferer","script":"ch1_thief_gone"},
    {"on":"victory","script":"ch1_end"}],
   "next":[{"if":"route_forest","chapter":"ch2a"},{"chapter":"ch2b"}]},
  "ch2a":{"name":"第二章 迷霧森林","fog":True,"prep":True,"shop":["vulnerary","elixir","ether","tonic","iron_sword","slim_sword","iron_lance","javelin","fire","thunder","heal_staff","physic"],
@@ -219,7 +222,7 @@ C={
    {"unit":"kit","team":"player","x":1,"y":4,"if":"kit_joined"},
    {"unit":"sera","team":"player","x":0,"y":2,"if":"sera_joined"},
    {"unit":"soldier","team":"enemy","x":7,"y":2},
-   {"unit":"soldier","team":"enemy","x":8,"y":6},
+   {"unit":"soldier","team":"enemy","x":8,"y":7,"ai":"ambush","group":"woods","zone":{"x":4,"y":5,"w":7,"h":3}},
    {"unit":"imp_archer","team":"enemy","x":10,"y":3},
    {"unit":"imp_mage","team":"enemy","x":10,"y":5},
    {"unit":"imp_knight","team":"enemy","x":11,"y":4,"ai":"hold"},
@@ -229,6 +232,7 @@ C={
   "events":[
    {"on":"start","script":"ch3_intro"},
    {"on":"death","unit":"voss","script":"ch3_voss"},
+   {"on":"ambush","script":"ch3_ambush"},
    {"on":"victory","script":"ch3_end"}],
   "next":["ch4"]},
  "ch4":{"name":"第四章 斷崖峽谷","prep":True,"shop":["vulnerary","elixir","ether","tonic","master_seal","iron_sword","killing_edge","brave_sword","silver_lance","long_bow","fire","thunder","dark_flux","heal_staff","physic"],"deploySlots":[{"x":1,"y":2},{"x":2,"y":7}],
@@ -242,7 +246,15 @@ C={
    "...==========...",
    "M...F....F....MM",
    "MM......~~~..MMM",
-   "MMMMM..~~~~MMMMM"]},
+   "MMMMM..~~~~MMMMM"],
+  "heights":[
+   "0000000022222200",
+   "0000000022222200",
+   "0000000022222200",
+   "0000000000000111",
+   "0000000000000111",
+   "0000000000000111",
+   "0000000000000111"]},
   "units":[
    {"unit":"alan","team":"player","x":0,"y":4,"forced":True},
    {"unit":"mira","team":"player","x":0,"y":5},
@@ -310,6 +322,7 @@ C={
 "scripts":{
  "ch4_intro":[
   {"cmd":"narrate","text":"帝國軍撤退到斷崖峽谷，闇術師赫爾加在此布陣。"},
+  {"cmd":"narrate","text":"【高低差】格子左上角的 ▲ 是高度。近戰從高處攻擊命中與傷害提升，從低處攻擊則會吃虧；弓箭、魔法與飛行單位不受影響。"},
   {"cmd":"say","who":"mira","text":"艾倫大人，這是在沃斯將軍營帳找到的騎士勳章。等級夠的人就能轉職成上級職業。"},
   {"cmd":"give","unit":"alan","item":"master_seal"},
   {"cmd":"gold","add":3000},
@@ -377,7 +390,9 @@ C={
   {"cmd":"say","who":"lina","text":"受傷了就到我身邊來，我用治療杖幫大家回復。"},
   {"cmd":"narrate","text":"【提示】點選我方單位→點藍色格移動→選擇行動：攻擊／杖／精神／道具／交換／待機。村莊(V)可以拜訪；艾倫可以和盜賊基特「交談」。"},
   {"cmd":"gold","add":1500},
-  {"cmd":"narrate","text":"【精神指令】消耗 SP 發動「必中」「熱血」「加速」等效果。【氣力】戰鬥與擊破敵人會提升，氣力越高傷害越大；艾倫的「流星斬」需要氣力 115。"}],
+  {"cmd":"narrate","text":"【精神指令】消耗 SP 發動「必中」「熱血」「加速」等效果。【氣力】戰鬥與擊破敵人會提升，氣力越高傷害越大；艾倫的「流星斬」需要氣力 115。"},
+  {"cmd":"say","who":"rook","text":"看！有個小偷抱著村裡的萬靈藥往東南邊跑了！"},
+  {"cmd":"narrate","text":"【朝向】單位腳下的箭頭是面向；從側面、背面攻擊命中與傷害提升，行動選單可「轉向」。【突進】米菈直線衝刺 2 格以上、攻擊正前方的敵人會發動突進。【逃跑】小偷逃到地圖邊緣就會帶著道具消失，擊倒他可以取回。【回溯】選單「回到上一步」每章可用 3 次。"}],
  "ch1_kit":[
   {"cmd":"say","who":"kit","text":"……你們不是帝國的人？"},
   {"cmd":"say","who":"alan","side":"right","text":"我們是來保護村子的。你不像山賊，為什麼跟他們在一起？"},
@@ -407,6 +422,11 @@ C={
   {"cmd":"spawn","units":[
     {"unit":"bandit","team":"enemy","x":15,"y":0,"ai":"aggressive"},
     {"unit":"bandit_axe","team":"enemy","x":14,"y":10,"ai":"aggressive"}]}],
+ "ch1_thief_gone":[
+  {"cmd":"say","who":"alan","side":"right","text":"可惡，小偷帶著萬靈藥逃走了……"}],
+ "ch3_ambush":[
+  {"cmd":"say","who":"voss","text":"森林裡的伏兵，出擊！"},
+  {"cmd":"say","who":"mira","text":"艾倫大人，小心側面！"}],
  "ch1_garr":[
   {"cmd":"say","who":"garr","text":"可、可惡……我加爾竟然……"},
   {"cmd":"gold","add":2000},

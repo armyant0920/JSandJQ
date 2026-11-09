@@ -6,10 +6,11 @@
   const RD = SRPG.renderer;
   const TS = RD.TS;
 
-  const tool = { mode: 'paint', terrain: 'plain', unit: null, team: 'enemy', ai: 'aggressive', selIdx: -1, zoom: 0.75 };
+  const tool = { mode: 'paint', terrain: 'plain', height: 1, unit: null, team: 'enemy', ai: 'aggressive', selIdx: -1, zoom: 0.75 };
   const TEAMS = [['player', '我方'], ['enemy', '敵方'], ['ally', '友軍']];
-  const AIS = [['aggressive', '主動進攻'], ['guard', '範圍內才行動'], ['hold', '原地不動']];
-  const EVENT_TYPES = [['start', '章節開始'], ['turn', '回合開始'], ['death', '單位陣亡'], ['talk', '交談'], ['visit', '拜訪地點'], ['victory', '勝利時']];
+  const AIS = [['aggressive', '主動進攻'], ['guard', '範圍內才行動'], ['hold', '原地不動'], ['cautious', '慎重'], ['ambush', '伏擊'], ['flee', '逃跑']];
+  const DIR_NAMES = [['0', '↓ 下'], ['1', '← 左'], ['2', '→ 右'], ['3', '↑ 上']];
+  const EVENT_TYPES = [['start', '章節開始'], ['turn', '回合開始'], ['death', '單位陣亡'], ['talk', '交談'], ['visit', '拜訪地點'], ['ambush', '伏兵出動'], ['escape', '單位逃走'], ['victory', '勝利時']];
   const VICTORY = [['rout', '殲滅敵軍'], ['boss', '擊破敵將（★）'], ['survive', '存活 N 回合'], ['seize', '主角壓制地點']];
   const DEFEAT = [['lordDies', '主角陣亡'], ['unitDies', '指定角色陣亡'], ['turnLimit', '超過回合限制']];
 
@@ -33,6 +34,17 @@
     return true;
   }
 
+  // 高度層：與地圖同尺寸的數字列；全部為 0 時移除
+  function setHeight(ch, x, y, v) {
+    const rows = ch.map.rows;
+    if (y < 0 || y >= rows.length || x < 0 || x >= rows[y].length) return false;
+    const H = rows.map((r, yy) => ((ch.map.heights || [])[yy] || '').padEnd(r.length, '0').slice(0, r.length));
+    if (H[y][x] === String(v)) return false;
+    H[y] = H[y].slice(0, x) + v + H[y].slice(x + 1);
+    if (H.every((r) => /^0*$/.test(r))) delete ch.map.heights; else ch.map.heights = H;
+    return true;
+  }
+
   function resize(ch, w, hgt) {
     const rows = ch.map.rows;
     const out = [];
@@ -41,6 +53,7 @@
       out.push((r + '.'.repeat(w)).slice(0, w));
     }
     ch.map.rows = out;
+    if (ch.map.heights) ch.map.heights = out.map((_, y) => ((ch.map.heights[y] || '') + '0'.repeat(w)).slice(0, w));
     ch.units = (ch.units || []).filter((p) => p.x < w && p.y < hgt);
   }
 
@@ -53,8 +66,13 @@
     RD.drawMap(ctx, ED.c, map, 0);
     (ch.units || []).forEach((p, i) => {
       const def = ED.c.units[p.unit] || {};
-      const fake = { uid: i, id: p.unit, name: def.name || p.unit, team: p.team || 'enemy', boss: p.boss };
-      RD.drawUnit(ctx, ED.c, fake, p.x * TS, p.y * TS, 0, { still: true, hp: false });
+      const fake = { uid: i, id: p.unit, name: def.name || p.unit, team: p.team || 'enemy', boss: p.boss, dir: p.dir != null ? p.dir : ((p.team || 'enemy') === 'enemy' ? 1 : 2) };
+      RD.drawUnit(ctx, ED.c, fake, p.x * TS, p.y * TS, 0, { still: true, hp: false, facing: !!((ED.c.meta || {}).rules || {}).facing });
+      const tagAi = { ambush: '伏', flee: '逃' }[p.ai];
+      if (tagAi && p.team !== 'player') { ctx.fillStyle = '#ffb347'; ctx.font = 'bold 13px sans-serif'; ctx.textAlign = 'right'; ctx.textBaseline = 'top'; ctx.fillText(tagAi, p.x * TS + TS - 3, p.y * TS + 14); }
+      // 選取中的伏擊區域、逃跑撤退點
+      if (i === tool.selIdx && p.ai === 'ambush' && p.zone) { ctx.fillStyle = 'rgba(255,120,40,0.18)'; ctx.fillRect(p.zone.x * TS, p.zone.y * TS, (p.zone.w || 1) * TS, (p.zone.h || 1) * TS); }
+      if (i === tool.selIdx && p.ai === 'flee' && p.escape) { ctx.strokeStyle = '#ffb347'; ctx.lineWidth = 3; ctx.setLineDash([4, 3]); ctx.strokeRect(p.escape.x * TS + 4, p.escape.y * TS + 4, TS - 8, TS - 8); ctx.setLineDash([]); ctx.fillStyle = '#ffb347'; ctx.font = 'bold 14px sans-serif'; ctx.textAlign = 'center'; ctx.fillText('出口', p.escape.x * TS + TS / 2, p.escape.y * TS + TS / 2); }
       if (i === tool.selIdx) { ctx.strokeStyle = '#ffd24a'; ctx.lineWidth = 3; ctx.strokeRect(p.x * TS + 2, p.y * TS + 2, TS - 4, TS - 4); }
     });
     const v = ch.victory || {};
@@ -82,6 +100,18 @@
       const t = tileOf(e);
       if (e.button === 2) return;
       if (tool.mode === 'paint') { painting = true; if (setTile(ch, t.x, t.y, tool.terrain)) { redraw(); ED.dirty(); } }
+      else if (tool.mode === 'height') { painting = true; if (setHeight(ch, t.x, t.y, tool.height)) { redraw(); ED.dirty(); } }
+      else if (tool.mode === 'zone' || tool.mode === 'exit') {
+        const p = ch.units[tool.selIdx];
+        if (!p) return;
+        if (tool.mode === 'exit') p.escape = { x: t.x, y: t.y };
+        else if (!tool.zoneStart) { tool.zoneStart = t; return; }
+        else {
+          const a = tool.zoneStart; tool.zoneStart = null;
+          p.zone = { x: Math.min(a.x, t.x), y: Math.min(a.y, t.y), w: Math.abs(a.x - t.x) + 1, h: Math.abs(a.y - t.y) + 1 };
+        }
+        tool.mode = 'unit'; ED.dirty(true);
+      }
       else if (tool.mode === 'unit') {
         const i = placementAt(t.x, t.y);
         if (i >= 0) tool.selIdx = i;
@@ -106,7 +136,12 @@
         ED.dirty(true);
       }
     });
-    cv.addEventListener('pointermove', (e) => { if (painting && tool.mode === 'paint') { const t = tileOf(e); if (setTile(ch, t.x, t.y, tool.terrain)) { redraw(); ED.dirty(); } } });
+    cv.addEventListener('pointermove', (e) => {
+      if (!painting) return;
+      const t = tileOf(e);
+      if (tool.mode === 'paint' && setTile(ch, t.x, t.y, tool.terrain)) { redraw(); ED.dirty(); }
+      if (tool.mode === 'height' && setHeight(ch, t.x, t.y, tool.height)) { redraw(); ED.dirty(); }
+    });
     window.addEventListener('pointerup', () => { painting = false; }, { once: true });
     cv.addEventListener('contextmenu', (e) => {
       e.preventDefault();
@@ -121,7 +156,7 @@
     const size = { w: W, h: H };
 
     const toolbar = h('div', {},
-      h('div.row', {}, modeBtn('paint', '🖌 地形'), modeBtn('unit', '🧍 單位'), modeBtn('seize', '🏁 壓制點'), modeBtn('visit', '🏠 拜訪點'), modeBtn('slot', '🔷 出擊位置'),
+      h('div.row', {}, modeBtn('paint', '🖌 地形'), modeBtn('height', '⛰ 高度'), modeBtn('unit', '🧍 單位'), modeBtn('seize', '🏁 壓制點'), modeBtn('visit', '🏠 拜訪點'), modeBtn('slot', '🔷 出擊位置'),
         h('span.hint', {}, '右鍵：刪除單位'),
         h('span', { style: { flex: 1 } }),
         '縮放', h('input', { type: 'range', min: 0.3, max: 1.5, step: 0.05, value: tool.zoom, oninput: (e) => { tool.zoom = +e.target.value; cv.style.width = Math.round(cv.width * tool.zoom) + 'px'; } }),
@@ -133,6 +168,11 @@
       h('button', { onclick: () => { if (!confirm('整張地圖填滿目前地形？')) return; ch.map.rows = ch.map.rows.map((r) => charFor(ch, tool.terrain).repeat(r.length)); ED.dirty(true); } }, '🪣 全部填滿')) : null,
       tool.mode === 'unit' ? h('div.row', {}, '單位', ED.select(tool, 'unit', ED.named('units')), '陣營', ED.select(tool, 'team', TEAMS), 'AI', ED.select(tool, 'ai', AIS),
         h('span.hint', {}, '點空格放置、點單位選取')) : null,
+      tool.mode === 'height' ? h('div.row', {}, '高度', ...[0, 1, 2, 3, 4, 5].map((v) => h('button', { className: tool.height === v ? 'on' : '', onclick: () => { tool.height = v; ED.render(); } }, v ? '▲' + v : '0（平地）')),
+        h('button', { onclick: () => { if (confirm('清除整張地圖的高度？')) { delete ch.map.heights; ED.dirty(true); } } }, '清除高度'),
+        h('span.hint', {}, ((ED.c.meta || {}).rules || {}).height ? '拖曳塗上高度；近戰從高處攻擊有加成' : '⚠ 劇本資訊尚未開啟「高低差」規則')) : null,
+      tool.mode === 'zone' ? h('p.hint', {}, tool.zoneStart ? '再點一下：區域的另一個角' : '點兩下設定伏擊觸發區域（兩個對角）') : null,
+      tool.mode === 'exit' ? h('p.hint', {}, '點地圖設定撤退點（逃跑單位抵達後離開地圖）') : null,
       tool.mode === 'seize' ? h('p.hint', {}, '點地圖設定壓制地點（勝利條件會改為「壓制」）') : null,
       tool.mode === 'visit' ? h('p.hint', {}, '點地圖新增「拜訪」事件（會自動建立一段劇本）') : null,
       tool.mode === 'slot' ? h('p.hint', {}, '點地圖新增/移除額外出擊位置（藍色虛線框）。出擊準備畫面中，名冊裡的其他角色會放在這些位置。') : null);
@@ -145,15 +185,30 @@
         h('td', {}, ED.select(p, 'team', TEAMS, { rerender: true })),
         h('td', {}, ED.num(p, 'x', { rerender: true, attrs: { style: 'width:48px' } })),
         h('td', {}, ED.num(p, 'y', { rerender: true, attrs: { style: 'width:48px' } })),
-        h('td', {}, p.team === 'player' ? '—' : ED.select(p, 'ai', AIS)),
+        h('td', {}, p.team === 'player' ? '—' : ED.select(p, 'ai', AIS, { rerender: true })),
         h('td', {}, p.team === 'player' ? ED.check(p, 'forced', '必出') : ED.check(p, 'boss')),
         h('td', {}, ED.num(p, 'level', { attrs: { style: 'width:48px', placeholder: '預設' } })),
         h('td', {}, ED.text(p, 'if', { optional: true, attrs: { style: 'width:90px', placeholder: '旗標', list: 'flagList' } })),
         h('td', {}, h('button.danger', { onclick: () => { ch.units.splice(i, 1); tool.selIdx = -1; ED.dirty(true); } }, '✕')))));
 
+    const sp = ch.units[tool.selIdx];
+    const unitDetail = sp ? h('div.card', {},
+      h('div.row', {}, h('b', {}, `#${tool.selIdx + 1} ${(ED.c.units[sp.unit] || {}).name || sp.unit}`),
+        '初始朝向', h('select', { onchange: (e) => { if (e.target.value === '') delete sp.dir; else sp.dir = +e.target.value; ED.dirty(true); } },
+          h('option', { value: '' }, '（預設）'), ...DIR_NAMES.map(([v, n]) => h('option', { value: v, selected: String(sp.dir) === v }, n))),
+        sp.team !== 'player' ? ED.check(sp, 'drops', '被擊倒時掉落道具') : null),
+      sp.ai === 'ambush' ? h('div.row', {}, '伏擊組', ED.text(sp, 'group', { optional: true, attrs: { placeholder: '同組一起出動', style: 'width:90px' } }),
+        '旗標觸發', ED.text(sp, 'trigger', { optional: true, attrs: { placeholder: '旗標', style: 'width:80px', list: 'flagList' } }),
+        h('button', { onclick: () => { tool.mode = 'zone'; tool.zoneStart = null; ED.render(); } }, sp.zone ? `區域 (${sp.zone.x},${sp.zone.y}) ${sp.zone.w}×${sp.zone.h}` : '設定觸發區域'),
+        sp.zone ? h('button.danger', { onclick: () => { delete sp.zone; ED.dirty(true); } }, '✕') : null,
+        h('span.hint', {}, '沒有區域與旗標時：敵人進入它的攻擊範圍就出動；受到攻擊也會出動')) : null,
+      sp.ai === 'flee' ? h('div.row', {}, h('button', { onclick: () => { tool.mode = 'exit'; ED.render(); } }, sp.escape ? `撤退點 (${sp.escape.x},${sp.escape.y})` : '設定撤退點'),
+        sp.escape ? h('button.danger', { onclick: () => { delete sp.escape; ED.dirty(true); } }, '✕') : null,
+        h('span.hint', {}, '未設定時走向最近的地圖邊緣；逃走會帶走持有的道具，被我方擊倒則掉落')) : null) : null;
+
     return h('div.split3', {}, left,
       h('div', {}, h('h2', {}, `地圖：${ch.name || id}（${W}×${H}）`), toolbar, err ? h('p.err', {}, err) : null, cv,
-        h('h2', {}, '出場單位'), unitTable),
+        h('h2', {}, '出場單位'), unitDetail, unitTable),
       chapterSettings(id, ch));
   };
 
@@ -168,6 +223,7 @@
       let params = [];
       if (t === 'turn') params = ['第', ED.num(ev, 'turn'), '回合', ED.select(ev, 'phase', [['player', '我方'], ['enemy', '敵方'], ['ally', '友軍']])];
       if (t === 'death') params = [ED.select(ev, 'unit', ED.named('units'))];
+      if (t === 'ambush' || t === 'escape') params = [ED.select(ev, 'unit', ED.named('units'), { optional: true, optionalLabel: '（任何單位）' })];
       if (t === 'talk') params = [ED.select(ev, 'a', ED.named('units')), '↔', ED.select(ev, 'b', ED.named('units'))];
       if (t === 'visit') params = ['x', ED.num(ev, 'x'), 'y', ED.num(ev, 'y')];
       return h('div.card', {},

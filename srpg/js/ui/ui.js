@@ -177,11 +177,11 @@
       ${statsHtml(u)}`;
   };
 
-  UI.terrainCard = function (t) {
+  UI.terrainCard = function (t, height) {
     const el = $('terrainCard');
     if (!t) { el.hidden = true; return; }
     el.hidden = false;
-    el.innerHTML = `<div class="row"><b>${esc(t.name)}</b><span>防+${t.def || 0} 迴避+${t.avo || 0}${t.heal ? ' 回復' + t.heal + '%' : ''}</span></div>`;
+    el.innerHTML = `<div class="row"><b>${esc(t.name)}${height ? ' ▲' + height : ''}</b><span>防+${t.def || 0} 迴避+${t.avo || 0}${t.heal ? ' 回復' + t.heal + '%' : ''}</span></div>`;
   };
 
   /* ---------- 戰鬥預測：opts = { att, def, weapons:[{i,name,icon}], cur, compute(i)→fc }

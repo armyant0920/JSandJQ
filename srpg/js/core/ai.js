@@ -1,6 +1,8 @@
 /* 敵方/友軍 AI
    ai 類型：aggressive(主動進攻) / guard(範圍內有目標才行動) / hold(原地不動，只攻擊射程內)
-            cautious(慎重：不打會被反擊打倒的仗，不站進會被圍攻致死的位置) */
+            cautious(慎重：不打會被反擊打倒的仗，不站進會被圍攻致死的位置)
+            ambush(伏擊：觸發前同 hold，觸發後整組變 aggressive)
+            flee(逃跑：不攻擊，往撤退點移動，抵達就離開地圖) */
 (function (root) {
   'use strict';
   const SRPG = root.SRPG = root.SRPG || {};
@@ -32,7 +34,7 @@
     for (const o of B.living(b)) {
       if (R.friendly(o.team, u.team)) continue;
       const k = pos.x + ',' + pos.y;
-      if (o.ai === 'hold') { if (!R.attackTilesFrom(b, o, o).some((p) => p.x === pos.x && p.y === pos.y)) continue; }
+      if (o.ai === 'hold' || o.ai === 'ambush') { if (!R.attackTilesFrom(b, o, o).some((p) => p.x === pos.x && p.y === pos.y)) continue; }
       else { const t = R.threatTiles(b, o); if (!t.atk.has(k) && !t.move.has(k)) continue; }
       const w = R.attackWeapons(b, o)[0];
       if (!w) continue;
@@ -110,8 +112,26 @@
   }
 
   /* 回傳 { x, y, target?:uid, heal?:uid, item?:索引, map?:{weapon,at} } */
+  // 逃跑：沿路徑往撤退點走到最遠可停的格子；抵達時 escape:true
+  function planFlee(b, u) {
+    const goal = B.escapePoint(b, u);
+    if (!goal) return { x: u.x, y: u.y, target: null };
+    if (u.x === goal.x && u.y === goal.y) return { x: u.x, y: u.y, target: null, escape: true };
+    const reach = R.reachable(b, u);
+    const far = R.reachable(b, u, 999);
+    if (!far.get(key(goal.x, goal.y))) return { x: u.x, y: u.y, target: null };
+    let dest = { x: u.x, y: u.y };
+    for (const p of R.pathTo(far, goal.x, goal.y)) {
+      const n = reach.get(key(p.x, p.y));
+      if (!n) break;
+      if (n.stop) dest = p;
+    }
+    return { x: dest.x, y: dest.y, target: null, escape: dest.x === goal.x && dest.y === goal.y };
+  }
+
   function plan(b, u) {
-    const reach = u.ai === 'hold' ? new Map([[key(u.x, u.y), { x: u.x, y: u.y, cost: 0, stop: true }]]) : R.reachable(b, u);
+    if (u.ai === 'flee') return planFlee(b, u);
+    const reach = u.ai === 'hold' || u.ai === 'ambush' ? new Map([[key(u.x, u.y), { x: u.x, y: u.y, cost: 0, stop: true }]]) : R.reachable(b, u);
     const foes = B.living(b).filter((o) => !R.friendly(o.team, u.team));
     const hv = planHeal(b, u, reach);
     if (hv && hv.score >= 5) return hv;
@@ -160,7 +180,9 @@
     // 沒有可攻擊目標：朝最近敵人前進（用無限移動力的路徑距離）
     const far = R.reachable(b, u, 999);
     let goal = null, gd = Infinity;
-    for (const t of foes) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    // 逃跑中的敵人不當前進目標（射程內仍會攻擊），只剩他們時才追
+    const chase = foes.some((o) => o.ai !== 'flee') ? foes.filter((o) => o.ai !== 'flee') : foes;
+    for (const t of chase) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const n = far.get(key(t.x + dx, t.y + dy));
       if (n && n.cost < gd) { gd = n.cost; goal = n; }
     }
@@ -175,6 +197,6 @@
     return { x: dest.x, y: dest.y, target: null };
   }
 
-  SRPG.ai = { plan, scoreAttack, planMap, pickSpirits, dangerAt };
+  SRPG.ai = { plan, planFlee, scoreAttack, planMap, pickSpirits, dangerAt };
   if (typeof module !== 'undefined' && module.exports) module.exports = SRPG;
 })(typeof window !== 'undefined' ? window : globalThis);

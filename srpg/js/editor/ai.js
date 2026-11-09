@@ -58,6 +58,7 @@
 - \`classes\`/\`units\` 另有：skills:[技能id]、st、mp、vision(霧戰視野)
 - \`classes\` 另有 promote:[{ to:職業id, level:10, item?:轉職道具id, bonus:{hp,str,…,mp,st}, weapons?:[武器id] }]（轉職路線）；道具 kind:"promote" 為轉職道具
 - \`weapons\` 另有 upMt / upHit（每級改造的威力與命中加成，預設 1 / 3）；\`meta.rules.upgrades\`:true 開啟改造
+- 神奇傳說要素（\`meta.rules\`）：facing:true(單位朝向；側擊 sideHit、背擊 backHit/backCrit/backDmg)、charge:true(突進：直線移動 chargeMin 格後攻擊正前方，chargeDmg/chargeHit；武器 charge:true 或技能 effect "charge")、height:true(高低差：heightHit/heightDmg 每層、heightMax、heightClimb 爬坡上限)、rewind:3(每章回溯次數，-1 無限)；技能 effect "vigilant" 不會被側擊/背擊
 - 精靈圖可加 poses:{ attack:[影格索引], hurt:[影格索引] }（其餘影格為待機）
 - \`supports\` 支援：{ "id": { a:角色id, b:角色id, ranks:[{rank:"C"|"B"|"A", need:支援值, script:劇本id}] } }
 - \`sprites\` / \`portraits\` 像素圖（見下）
@@ -77,11 +78,13 @@
     if (scopes.includes('maps')) parts.push(`## 章節格式
 \`\`\`
 { "name":"第X章 標題",
-  "map": { "rows": [ "MMM..FF....", ... ] },          // 每列字元 = 地形 char，所有列等長
-  "units": [ { "unit":"角色id", "team":"player|enemy|ally", "x":0, "y":0, "ai":"aggressive|guard|hold", "boss":true?, "level":5? } ],
+  "map": { "rows": [ "MMM..FF....", ... ],            // 每列字元 = 地形 char，所有列等長
+           "heights": [ "0001100....", ... ]? },       // 高度層（選用）：與 rows 同尺寸的數字 0–9
+  "units": [ { "unit":"角色id", "team":"player|enemy|ally", "x":0, "y":0, "ai":"aggressive|guard|hold|cautious|ambush|flee", "boss":true?, "level":5?, "dir":0-3?(下左右上),
+               "group":"伏擊組"?, "zone":{"x","y","w","h"}?(伏擊觸發區域), "trigger":"旗標"?, "escape":{"x","y"}?(逃跑撤退點), "drops":true?(擊倒掉落道具) } ],
   "victory": { "type":"rout|boss|survive|seize", "turns":5?, "x":?, "y":? },
   "defeat":  { "type":"lordDies|unitDies|turnLimit", "unit"?:id, "turns"?:n },
-  "events": [ { "on":"start|turn|death|talk|visit|victory", "turn"?:n, "phase"?:"player|enemy", "unit"?:id, "a"?:id, "b"?:id, "x"?:n, "y"?:n, "if"?:"旗標", "script":"劇本id" } ],
+  "events": [ { "on":"start|turn|death|talk|visit|ambush|escape|victory", "turn"?:n, "phase"?:"player|enemy", "unit"?:id, "a"?:id, "b"?:id, "x"?:n, "y"?:n, "if"?:"旗標", "script":"劇本id" } ],
   "next": [ { "if":"旗標", "chapter":"chA" }, { "chapter":"chB" } ],  // 由上往下第一個符合；空陣列=結局
   "fog": true?, "prep": true?, "shop": [武器或道具id]?, "deploySlots": [{"x":0,"y":0}]? }   // 霧戰、出擊準備、商店、額外出擊位置
 \`\`\`

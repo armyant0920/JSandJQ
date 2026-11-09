@@ -83,7 +83,7 @@
     if ((ev.on || 'start') !== type) return false;
     switch (type) {
       case 'turn': return ev.turn === info.turn && (ev.phase || 'player') === info.phase;
-      case 'death': return ev.unit === info.unit;
+      case 'death': case 'escape': case 'ambush': return !ev.unit || ev.unit === info.unit;
       case 'talk': return (ev.a === info.a && ev.b === info.b) || (ev.a === info.b && ev.b === info.a);
       case 'visit': return ev.x === info.x && ev.y === info.y;
       default: return true;
@@ -116,18 +116,26 @@
     const n = reach.get(x + ',' + y);
     if (!n || !n.stop) return null;
     const path = R.pathTo(reach, x, y);
-    if (!u.prevPos) u.prevPos = { x: u.x, y: u.y, used: u.moveUsed || 0 };
+    if (!u.prevPos) u.prevPos = { x: u.x, y: u.y, used: u.moveUsed || 0, dir: u.dir };
     u.moveUsed = (u.prevPos.used || 0) + n.cost;
     if (path.length > 1) {
       const a = path[path.length - 2], z = path[path.length - 1];
-      u.dir = z.y > a.y ? 0 : z.x < a.x ? 1 : z.x > a.x ? 2 : 3;
-    }
+      u.dir = R.dirToward(a, z);
+      // 突進距離：路徑最後一段同方向的直線格數（再移動時接續計算）
+      let run = 0;
+      for (let i = path.length - 1; i > 0 && R.dirToward(path[i - 1], path[i]) === u.dir; i--) run++;
+      u.chargeRun = run;
+    } else u.chargeRun = 0;
     u.x = x; u.y = y; u.moved = true;
     return path;
   }
 
   function undoMove(u) {
-    if (u.prevPos && !u.acted) { u.x = u.prevPos.x; u.y = u.prevPos.y; u.moveUsed = u.prevPos.used || 0; u.moved = false; delete u.prevPos; }
+    if (u.prevPos && !u.acted) {
+      u.x = u.prevPos.x; u.y = u.prevPos.y; u.moveUsed = u.prevPos.used || 0; u.moved = false;
+      if (u.prevPos.dir != null) u.dir = u.prevPos.dir;
+      delete u.prevPos; delete u.chargeRun; delete u.turned;
+    }
   }
 
   // 選擇可在距離 d 使用的攻擊武器（威力最高者）
@@ -218,13 +226,30 @@
     if (u.team === 'player' && hasEvent(b, 'visit', { x: u.x, y: u.y })) acts.push({ id: 'visit', name: '拜訪' });
     const v = b.chapter.victory || {};
     if (v.type === 'seize' && u.lord && u.x === v.x && u.y === v.y) acts.push({ id: 'seize', name: '壓制' });
+    if (R.rulesOf(b).facing && u.team === 'player') acts.push({ id: 'turn', name: '轉向', free: true });
     acts.push({ id: 'wait', name: '待機' });
     return acts;
   }
 
+  // 朝向開啟時，行動結束自動面向最近的敵人（玩家用「轉向」手動指定時除外）
+  function faceNearestFoe(b, u) {
+    if (!R.rulesOf(b).facing || u.hp <= 0) return;
+    let best = null, bd = Infinity;
+    for (const o of living(b)) {
+      if (R.friendly(o.team, u.team)) continue;
+      const d = dist(o, u);
+      if (d < bd) { bd = d; best = o; }
+    }
+    const d = best && R.dirToward(u, best);
+    if (d != null) u.dir = d;
+  }
+  function turnTo(u, dir) { u.dir = dir; u.turned = true; }
+
   // canto:true 的行動完成後，有「再移動」技能的我方單位可用剩餘移動力移動（u.cantoMove）
   function finishAction(b, u, canto) {
     u.acted = true;
+    if (!u.turned) faceNearestFoe(b, u);
+    delete u.turned;
     const left = R.moveOf(u) - (u.moveUsed || 0);
     delete u.prevPos;
     if (u.buffs) delete u.buffs.accel;
@@ -273,8 +298,89 @@
       gainExp(b, me, R.expGain(me, foe, didHit, killed), res);
     }
     for (const d of [u, t]) if (d.hp <= 0) { res.deaths.push(d); dropOnDeath(b, d); fire(b, 'death', { unit: d.id }); }
+    const killer = u.hp > 0 && t.hp <= 0 ? u : t.hp > 0 && u.hp <= 0 ? t : null;
+    if (killer) { res.loot = takeLoot(b, killer, killer === u ? t : u); res.lootBy = killer.uid; }
+    if (t.hp > 0 && t.ai === 'ambush') wakeAmbush(b, t);
     finishAction(b, u, true);
     return res;
+  }
+
+  // 我方擊倒逃跑型（或標記 drops）的敵人時，取得其持有道具；回傳道具名稱
+  function takeLoot(b, killer, dead) {
+    if (killer.team !== 'player' || !(dead.ai === 'flee' || dead.drops) || !(dead.items || []).length) return [];
+    const names = dead.items.map((it) => (b.campaign.items[it.id] || {}).name || it.id);
+    killer.items = (killer.items || []).concat(dead.items);
+    dead.items = [];
+    return names;
+  }
+
+  /* ---------- 回溯 ---------- */
+  // 剩餘回溯次數（rules.rewind：0 關閉、-1 無限）
+  function rewindsLeft(b) {
+    const n = R.rulesOf(b).rewind || 0;
+    return n < 0 ? Infinity : Math.max(0, n - (b.rewindsUsed || 0));
+  }
+  // 快照只是序列化後的戰場；亂數狀態也一起還原，重做同一個行動會得到同樣結果
+  function rewindTo(b, snap) {
+    const used = (b.rewindsUsed || 0) + 1;
+    const nb = restore(b.campaign, snap);
+    nb.rewindsUsed = used;
+    return nb;
+  }
+
+  /* ---------- 伏擊 / 逃跑 ---------- */
+  // 伏擊單位甦醒（同 group 一起出動），改用 aggressive
+  function wakeAmbush(b, u) {
+    const woke = [];
+    for (const o of b.units) {
+      if (o.ai !== 'ambush' || o.hp <= 0) continue;
+      if (o !== u && !(u.group && o.group === u.group)) continue;
+      o.ai = 'aggressive'; woke.push(o);
+    }
+    if (woke.length) fire(b, 'ambush', { unit: u.id });
+    return woke;
+  }
+
+  // 伏擊觸發：旗標成立、敵人進入 zone（未設定 zone 時為自身攻擊範圍）、或已受傷
+  function ambushTriggered(b, u) {
+    if (u.trigger && b.flags[u.trigger]) return true;
+    if (u.hp < u.stats.hp) return true;
+    const foes = living(b).filter((o) => !R.friendly(o.team, u.team));
+    if (u.zone) {
+      const z = u.zone;
+      return foes.some((o) => o.x >= z.x && o.y >= z.y && o.x < z.x + (z.w || 1) && o.y < z.y + (z.h || 1));
+    }
+    if (u.trigger) return false;
+    const th = R.threatTiles(b, u);
+    return foes.some((o) => th.atk.has(o.x + ',' + o.y) || th.move.has(o.x + ',' + o.y));
+  }
+
+  function checkAmbushes(b) {
+    const woke = [];
+    for (const u of living(b)) if (u.ai === 'ambush' && ambushTriggered(b, u)) woke.push(...wakeAmbush(b, u));
+    return woke;
+  }
+
+  // 逃跑目的地：單位 escape → 章節 escape → 最近的地圖邊緣（可站立）
+  function escapePoint(b, u) {
+    if (u.escape) return u.escape;
+    if (b.chapter.escape) return b.chapter.escape;
+    const far = R.reachable(b, u, 999);
+    let best = null;
+    for (const n of far.values()) {
+      if (!n.stop || (n.x > 0 && n.y > 0 && n.x < b.map.w - 1 && n.y < b.map.h - 1)) continue;
+      if (!best || n.cost < best.cost) best = n;
+    }
+    return best ? { x: best.x, y: best.y } : null;
+  }
+
+  // 逃走：離開地圖，帶走的道具一併消失
+  function escape(b, u) {
+    u.escaped = true; u.acted = true;
+    dropOnDeath(b, u);
+    fire(b, 'escape', { unit: u.id });
+    checkOutcome(b);
+    return u;
   }
 
   // 地圖兵器：at 為中心（burst）或方向格（line）。所有範圍內目標各受一擊、不會反擊
@@ -287,7 +393,7 @@
     const RU = R.rulesOf(b);
     let expSum = 0;
     for (const v of victims) {
-      const s = R.combatSide(b, u, v, u, v, { weapon: w, ignoreRange: true });
+      const s = R.combatSide(b, u, v, u, v, { weapon: w, ignoreRange: true, initiator: true });
       if (!s) continue;
       let hit, evaded = false;
       if (v.buffs && v.buffs.alert) { hit = false; evaded = true; delete v.buffs.alert; }
@@ -478,9 +584,10 @@
     b.phase = phase;
     const msgs = [];
     const RU = R.rulesOf(b);
+    for (const u of checkAmbushes(b)) msgs.push({ uid: u.uid, ambush: true });
     if (phase === 'player') gainSupportPoints(b);
     for (const u of b.units.filter((x) => x.hp > 0 && x.team === phase)) {
-      u.acted = !!u.carriedBy; u.moved = false; u.moveUsed = 0; delete u.prevPos; delete u.cantoMove;
+      u.acted = !!u.carriedBy; u.moved = false; u.moveUsed = 0; delete u.prevPos; delete u.cantoMove; delete u.chargeRun;
       if (RU.resources) {
         if (u.maxSt) u.st = Math.min(u.maxSt, u.st + RU.stRegen);
         if (u.maxMp) u.mp = Math.min(u.maxMp, u.mp + RU.mpRegen);
@@ -505,7 +612,7 @@
       if (i === 0) b.turn++;
       if (PHASES[i] === 'player' || living(b, PHASES[i]).length) break;
     }
-    startPhase(b, PHASES[i]);
+    b.phaseMsgs = startPhase(b, PHASES[i]);
     return b.phase;
   }
 
@@ -585,7 +692,7 @@
     healTargets, tradePartners, spiritsUsable, spiritTargets, rescueTargets, dropTiles, supportTargets, nextSupportRank,
     attack, mapAttack, heal, useItem, transfer, useSpirit, rescue, drop, supportTalk, gainSupportPoints,
     cantoMove, endCanto, talk, visit, seize, wait, startPhase, endPhase, phaseDone, checkOutcome,
-    objectiveText, commitRoster, spawn, recruit, give, learn, promote, itemUsable,
+    objectiveText, commitRoster, rewindsLeft, rewindTo, faceNearestFoe, turnTo, takeLoot, wakeAmbush, ambushTriggered, checkAmbushes, escapePoint, escape, spawn, recruit, give, learn, promote, itemUsable,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = SRPG;
 })(typeof window !== 'undefined' ? window : globalThis);

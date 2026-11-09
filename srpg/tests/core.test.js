@@ -691,3 +691,146 @@ test('平衡統計工具：整套劇本可自動跑完不出錯', () => {
   const stats = T.simulate(c, 2, { retries: 1 });
   assert.ok(stats.ch1 && stats.ch1.runs === 2);
 });
+
+/* ---------- M6c 神奇傳說要素 ---------- */
+function farland(rules, mapExtra, units) {
+  const c = mini({ meta: { start: 'c', rules: Object.assign({}, rules) } });
+  c.chapters.c.map = Object.assign({ rows: ['.......', '.......', '.......', '.......'] }, mapExtra || {});
+  c.chapters.c.units = units || [{ unit: 'a', team: 'player', x: 3, y: 1 }, { unit: 'e', team: 'enemy', x: 4, y: 1 }];
+  const b = B.createBattle(c, 'c', { seed: 7 });
+  return { c, b, a: b.units[0], e: b.units[1] };
+}
+
+test('朝向：側擊/背擊加成、只給主動攻擊方、攻擊後轉向、警覺技能', () => {
+  const { b, a, e } = farland({ facing: true });
+  e.dir = 1; // 面向左（面對 a）
+  let fc = R.forecast(b, a, e);
+  assert.equal(fc.att.facing, 'front');
+  const base = fc.att;
+  e.dir = 2; // 背對 a
+  fc = R.forecast(b, a, e);
+  assert.equal(fc.att.facing, 'back');
+  assert.equal(fc.att.dmg, base.dmg + R.DEFAULT_RULES.backDmg);
+  assert.ok(fc.att.tags.includes('背擊'));
+  assert.equal(fc.def.facing, null, '反擊方不吃位置加成');
+  e.dir = 0;
+  assert.equal(R.forecast(b, a, e).att.facing, 'side');
+  // 攻擊後雙方面對面
+  e.dir = 2; a.dir = 0;
+  B.attack(b, a, e);
+  assert.equal(a.dir, 2); if (e.hp > 0) assert.equal(e.dir, 1);
+  // 警覺：不會被背擊
+  b.campaign.skills.vig = { name: '警覺', effect: 'vigilant' };
+  e.skills.push('vig'); e.dir = 2; e.hp = e.stats.hp;
+  assert.equal(R.forecast(b, a, e).att.facing, 'front');
+  // 規則關閉時沒有加成
+  const off = farland({});
+  off.e.dir = 2;
+  assert.equal(R.forecast(off.b, off.a, off.e).att.facing, null);
+});
+
+test('突進：直線移動 ≥ 門檻後攻擊正前方的敵人有加成，轉彎或不同方向則無', () => {
+  const units = [{ unit: 'a', team: 'player', x: 0, y: 1 }, { unit: 'e', team: 'enemy', x: 4, y: 1 }];
+  const { b, a, e } = farland({ charge: true }, null, units);
+  b.campaign.weapons.sword.charge = true;
+  B.moveUnit(b, a, 3, 1);
+  assert.equal(a.chargeRun, 3); assert.equal(a.dir, 2);
+  let fc = R.forecast(b, a, e);
+  assert.ok(fc.att.charge); assert.ok(fc.att.tags.includes('突進'));
+  const withCharge = fc.att.dmg;
+  B.undoMove(a);
+  assert.equal(a.chargeRun, undefined);
+  // 從上方繞下來：最後一段只有 1 格
+  B.moveUnit(b, a, 0, 0); a.moved = false; delete a.prevPos;
+  e.x = 3; e.y = 1;
+  B.moveUnit(b, a, 3, 0); // 向右 3 格，但敵人在下方
+  fc = R.forecast(b, a, e);
+  assert.ok(!fc.att.charge, '敵人不在移動方向上');
+  assert.equal(fc.att.dmg, withCharge - R.DEFAULT_RULES.chargeDmg);
+  // 結算後突進距離清除
+  e.x = 4; e.y = 0;
+  B.attack(b, a, e);
+  assert.equal(a.chargeRun, undefined);
+});
+
+test('高低差：近戰高處加成、低處減益、遠程與飛行不受影響、爬坡限制', () => {
+  const { b, a, e } = farland({ height: true }, { heights: ['', '0002', '', ''] });
+  assert.equal(R.heightAt(b, 3, 1), 2); assert.equal(R.heightAt(b, 4, 1), 0);
+  const fc = R.forecast(b, a, e);
+  assert.equal(fc.att.height, 2);
+  assert.ok(fc.att.tags.some((t) => t.startsWith('高處')));
+  a.x = 4; a.y = 0; // a 在平地(0)，e 移到高處
+  e.x = 3; e.y = 1;
+  const low = R.forecast(b, a, { ...e, x: 4, y: 1 }); // 同高度
+  e.x = 4; e.y = 1;
+  b.map.heights[1][4] = 3;
+  const up = R.forecast(b, a, e);
+  assert.equal(up.att.height, -2, '最多 heightMax');
+  assert.ok(up.att.hit < low.att.hit || low.att.hit === 100);
+  // 爬坡限制：高度差 > heightClimb 的格子走不過去
+  const cl = farland({ height: true, heightClimb: 1 }, { heights: ['', '0003000', '', ''] }, [{ unit: 'a', team: 'player', x: 2, y: 1 }, { unit: 'e', team: 'enemy', x: 6, y: 3 }]);
+  assert.ok(!R.reachable(cl.b, cl.a).has('3,1'));
+  assert.ok(R.reachable(cl.b, cl.a).has('3,0'), '旁邊的平地可以走');
+});
+
+test('伏擊：觸發前不動、進入區域或受到攻擊後整組出動', () => {
+  const units = [
+    { unit: 'a', team: 'player', x: 0, y: 0 },
+    { unit: 'e', team: 'enemy', x: 6, y: 3, ai: 'ambush', group: 'g1', zone: { x: 4, y: 0, w: 3, h: 4 } },
+    { unit: 'e', team: 'enemy', x: 6, y: 0, ai: 'ambush', group: 'g1', zone: { x: 4, y: 0, w: 3, h: 4 } },
+  ];
+  const { b, a } = farland({}, null, units);
+  const [, e1, e2] = b.units;
+  const p = AI.plan(b, e1);
+  assert.deepEqual([p.x, p.y], [6, 3], '觸發前原地不動');
+  assert.equal(B.checkAmbushes(b).length, 0);
+  a.x = 4; a.y = 2;
+  const woke = B.checkAmbushes(b);
+  assert.equal(woke.length, 2);
+  assert.equal(e1.ai, 'aggressive'); assert.equal(e2.ai, 'aggressive');
+  // 旗標觸發
+  const f = farland({}, null, [{ unit: 'a', team: 'player', x: 0, y: 0 }, { unit: 'e', team: 'enemy', x: 6, y: 3, ai: 'ambush', trigger: 'alarm' }]);
+  assert.equal(B.checkAmbushes(f.b).length, 0);
+  f.b.flags.alarm = true;
+  assert.equal(B.checkAmbushes(f.b).length, 1);
+});
+
+test('逃跑：往撤退點移動、抵達後離開地圖；被我方擊倒會掉落道具', () => {
+  const units = [
+    { unit: 'a', team: 'player', x: 0, y: 3 },
+    { unit: 'e', team: 'enemy', x: 3, y: 1, ai: 'flee', escape: { x: 6, y: 1 } },
+  ];
+  const { b, a, e } = farland({}, null, units);
+  e.items = [{ id: 'vulnerary', uses: 3 }];
+  let p = AI.plan(b, e);
+  assert.deepEqual([p.x, p.y], [6, 1]); assert.ok(p.escape);
+  B.moveUnit(b, e, p.x, p.y); B.escape(b, e);
+  assert.ok(e.escaped); assert.ok(!R.onMap(e));
+  assert.equal(b.status, 'victory', '逃走後沒有敵人 → 殲滅');
+  // 擊倒掉落
+  const g = farland({}, null, [{ unit: 'a', team: 'player', x: 3, y: 1 }, { unit: 'e', team: 'enemy', x: 4, y: 1, ai: 'flee' }]);
+  g.e.items = [{ id: 'vulnerary', uses: 3 }]; g.e.hp = 1;
+  const res = B.attack(g.b, g.a, g.e);
+  assert.deepEqual(res.loot, ['傷藥']);
+  assert.ok(g.a.items.some((it) => it.id === 'vulnerary'));
+  // 沒設定撤退點時走向最近的地圖邊緣
+  const h = farland({}, null, [{ unit: 'a', team: 'player', x: 0, y: 0 }, { unit: 'e', team: 'enemy', x: 3, y: 2, ai: 'flee' }]);
+  const ep = B.escapePoint(h.b, h.e);
+  assert.ok(ep.x === 0 || ep.y === 0 || ep.x === 6 || ep.y === 3);
+});
+
+test('回溯：次數限制、還原狀態（含亂數）', () => {
+  const { b, a, e } = farland({ rewind: 2 });
+  assert.equal(B.rewindsLeft(b), 2);
+  const snap = B.serialize(b);
+  const r1 = B.attack(b, a, e);
+  let nb = B.rewindTo(b, snap);
+  assert.equal(B.rewindsLeft(nb), 1);
+  assert.equal(nb.units[1].hp, nb.units[1].stats.hp);
+  const r2 = B.attack(nb, nb.units[0], nb.units[1]);
+  assert.deepEqual(r2.combat.strikes.map((s) => s.hit), r1.combat.strikes.map((s) => s.hit), '同樣行動同樣結果');
+  nb = B.rewindTo(nb, snap);
+  assert.equal(B.rewindsLeft(nb), 0);
+  assert.equal(B.rewindsLeft(farland({ rewind: -1 }).b), Infinity);
+  assert.equal(B.rewindsLeft(farland({}).b), 0);
+});

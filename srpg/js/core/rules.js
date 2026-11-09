@@ -19,7 +19,34 @@
     upgrades: false,      // SRW 式改造（出擊準備畫面花錢強化）
     upgradeMax: 5,
     promoteReset: true,   // 轉職後等級回到 1
+    // ---- 神奇傳說要素 ----
+    facing: false,        // 單位朝向：從側面/背面發動攻擊有加成
+    sideHit: 10, sideCrit: 0, sideDmg: 0,
+    backHit: 20, backCrit: 0, backDmg: 2,
+    facingTurn: true,     // 被攻擊後轉向攻擊者
+    charge: false,        // 突進：直線移動 chargeMin 格以上後近戰攻擊同方向的敵人
+    chargeMin: 2, chargeDmg: 3, chargeHit: 10,
+    height: false,        // 高低差：近戰從高處攻擊有加成（飛行單位不受影響）
+    heightHit: 10, heightDmg: 1, heightMax: 2,
+    heightClimb: 0,       // 非飛行單位一步最多能爬的高度差（0 = 不限制）
+    rewind: 0,            // 回溯次數（每章）：0 = 關閉、-1 = 無限
   };
+  // 朝向：0 下、1 左、2 右、3 上（與行走圖列順序相同）
+  const DIRS = [[0, 1], [-1, 0], [1, 0], [0, -1]];
+  function dirToward(from, to) {
+    const dx = to.x - from.x, dy = to.y - from.y;
+    if (!dx && !dy) return null;
+    if (Math.abs(dx) >= Math.abs(dy)) return dx < 0 ? 1 : 2;
+    return dy > 0 ? 0 : 3;
+  }
+  // 攻擊者在 pos 時，相對於 def 的方位：front / side / back
+  function facingRelation(def, defPos, atkPos) {
+    const f = DIRS[def.dir != null ? def.dir : 0];
+    const dot = (atkPos.x - defPos.x) * f[0] + (atkPos.y - defPos.y) * f[1];
+    return dot > 0 ? 'front' : dot < 0 ? 'back' : 'side';
+  }
+  const isFlier = (u) => u.moveType === 'fly' || (u.tags || []).includes('flying');
+  function heightAt(b, x, y) { return (b.map.heights && b.map.heights[y] && b.map.heights[y][x]) || 0; }
   // 武器相剋：key 剋 value
   const TRIANGLE = { sword: 'axe', axe: 'lance', lance: 'sword', anima: 'light', light: 'dark', dark: 'anima' };
 
@@ -47,6 +74,8 @@
     sol:     { name: '太陽', params: ['rate', 'rateMul'] },
     luna:    { name: '月光', params: ['rate', 'rateMul'] },
     bonus:   { name: '能力加成', params: ['hit', 'avo', 'crit', 'dmg', 'block'] },
+    charge:  { name: '突進', params: [] },                // 直線移動後的近戰攻擊有加成（需開啟 charge 規則）
+    vigilant:{ name: '警覺', params: [] },                // 不會被側擊/背擊
   };
 
   const SUPPORT_BONUS = { C: { hit: 5, avo: 5 }, B: { hit: 10, avo: 10, dmg: 1 }, A: { hit: 15, avo: 15, dmg: 2, crit: 5 } };
@@ -55,7 +84,7 @@
 
   const friendly = (a, b) => (a === 'enemy') === (b === 'enemy');
   const buffs = (u) => u.buffs || {};
-  const onMap = (u) => u.hp > 0 && !u.carriedBy;
+  const onMap = (u) => u.hp > 0 && !u.carriedBy && !u.escaped;
 
   /* ---------- 技能 ---------- */
   function skillsOf(b, u) {
@@ -89,6 +118,8 @@
   /* 可移動範圍（Dijkstra）。可穿過友軍、不能穿過敵軍；回傳 Map(key → {x,y,cost,prev,stop}) */
   function reachable(b, u, moveOverride) {
     const mv = moveOverride != null ? moveOverride : moveOf(u);
+    const RU = rulesOf(b);
+    const climb = RU.height && RU.heightClimb > 0 && !isFlier(u) ? RU.heightClimb : 0;
     const occ = new Map();
     for (const o of b.units) if (onMap(o)) occ.set(key(o.x, o.y), o);
     const out = new Map();
@@ -102,6 +133,7 @@
         const nx = cur.x + dx, ny = cur.y + dy;
         const c = cur.cost + moveCost(terrainAt(b, nx, ny), u.moveType);
         if (c > mv) continue;
+        if (climb && Math.abs(heightAt(b, nx, ny) - heightAt(b, cur.x, cur.y)) > climb) continue;
         const o = occ.get(key(nx, ny));
         if (o && !friendly(o.team, u.team)) continue;
         const k = key(nx, ny);
@@ -241,9 +273,11 @@
       if (ow && !isStaff(ow) && TRIANGLE[w.type] === ow.type) tri = 1;
       else if (ow && !isStaff(ow) && TRIANGLE[ow.type] === w.type) tri = -1;
     }
-    const atk = (magic ? me.stats.mag : me.stats.str) + mt + tri * R.triangleDmg + myBonus.dmg + sMe.dmg;
+    // 位置加成（只給主動攻擊方）：朝向、突進、高低差
+    const pos = positionBonus(b, me, other, myPos, otherPos, w, opts);
+    const atk = (magic ? me.stats.mag : me.stats.str) + mt + tri * R.triangleDmg + myBonus.dmg + sMe.dmg + pos.dmg;
     const defStat = (magic ? other.stats.res : other.stats.def) + (tOther.def || 0);
-    const tags = [];
+    const tags = pos.tags.slice();
     const finish = (raw) => {
       let dmg = Math.max(0, raw - otBonus.block);
       if (R.morale) dmg = Math.floor(dmg * (me.morale || 100) / (other.morale || 100));
@@ -255,7 +289,7 @@
     const dmgLuna = finish(Math.max(0, atk));
     if (mb.valor) tags.push('熱血');
     if (ob.ironWall) tags.push('對方鐵壁');
-    let hitRaw = (w.hit || 0) + wl * (w.upHit != null ? w.upHit : 3) + ms.skl * 2 + Math.floor(me.stats.lck / 2) + tri * R.triangleHit + myBonus.hit + sMe.hit;
+    let hitRaw = (w.hit || 0) + wl * (w.upHit != null ? w.upHit : 3) + ms.skl * 2 + Math.floor(me.stats.lck / 2) + tri * R.triangleHit + myBonus.hit + sMe.hit + pos.hit;
     let avo = os.spd * 2 + other.stats.lck + (tOther.avo || 0) + otBonus.avo + sOt.avo;
     if (mb.focus) { hitRaw += 30; tags.push('集中'); }
     if (ob.focus) avo += 30;
@@ -264,7 +298,7 @@
     const hit = ob.alert ? 0 : hitBase;
     if (ob.alert) tags.push('對方閃避');
     if (sMe.partners.length) tags.push('支援 ' + sMe.partners.join('、'));
-    const crit = clamp((w.crit || 0) + Math.floor(ms.skl / 2) - other.stats.lck + myBonus.crit + sMe.crit, 0, 100);
+    const crit = clamp((w.crit || 0) + Math.floor(ms.skl / 2) - other.stats.lck + myBonus.crit + sMe.crit + pos.crit, 0, 100);
     const purs = hasSkill(b, me, 'pursuit');
     const threshold = R.doubleThreshold - (purs ? (purs.value || 2) : 0);
     const count = opts.ignoreRange ? 1 : (ms.spd - os.spd >= threshold ? 2 : 1);
@@ -275,12 +309,45 @@
       if (sk) procs.push({ effect: eff, name: sk.name, rate: skillRate(me, sk) });
     }
     return { weapon: w.name || w.id, weaponId: w.id, icon: w.icon, dmg, dmgLuna, hit, hitBase, crit, count, per,
-      strikes: count * per, tri, tags, procs, cost: weaponCost(w) };
+      strikes: count * per, tri, tags, procs, cost: weaponCost(w), facing: pos.facing, charge: pos.charge, height: pos.height };
+  }
+
+  // 突進條件：本回合最後一段直線移動 ≥ chargeMin 格，攻擊相鄰且在移動方向正前方的敵人
+  function canCharge(b, me, w) {
+    const R = rulesOf(b);
+    if (!R.charge || !w || !(w.charge || hasSkill(b, me, 'charge'))) return false;
+    return (me.chargeRun || 0) >= R.chargeMin;
+  }
+
+  /* 位置加成：{ hit, crit, dmg, tags, facing, charge, height }
+     opts.initiator 為 true 時才計算（反擊方不吃這些加成）；地圖兵器只計朝向 */
+  function positionBonus(b, me, other, myPos, otherPos, w, opts) {
+    const R = rulesOf(b);
+    const out = { hit: 0, crit: 0, dmg: 0, tags: [], facing: null, charge: false, height: 0 };
+    if (!opts.initiator) return out;
+    if (R.facing) {
+      const rel = hasSkill(b, other, 'vigilant') ? 'front' : facingRelation(other, otherPos, myPos);
+      out.facing = rel;
+      if (rel === 'side') { out.hit += R.sideHit; out.crit += R.sideCrit; out.dmg += R.sideDmg; out.tags.push('側擊'); }
+      if (rel === 'back') { out.hit += R.backHit; out.crit += R.backCrit; out.dmg += R.backDmg; out.tags.push('背擊'); }
+    }
+    if (opts.ignoreRange) return out;
+    const melee = dist(myPos, otherPos) === 1;
+    if (melee && myPos.x === me.x && myPos.y === me.y && canCharge(b, me, w) &&
+        dirToward(myPos, otherPos) === me.dir) {
+      out.charge = true; out.dmg += R.chargeDmg; out.hit += R.chargeHit; out.tags.push('突進');
+    }
+    if (R.height && melee && !isFlier(me) && !isFlier(other)) {
+      const d = clamp(heightAt(b, myPos.x, myPos.y) - heightAt(b, otherPos.x, otherPos.y), -R.heightMax, R.heightMax);
+      out.height = d;
+      if (d) { out.hit += d * R.heightHit; out.dmg += d * R.heightDmg; out.tags.push(d > 0 ? '高處 +' + d : '低處 ' + d); }
+    }
+    return out;
   }
 
   function forecast(b, att, def, from) {
     const aPos = from || att;
-    return { att: combatSide(b, att, def, aPos, def), def: combatSide(b, def, att, def, aPos) };
+    return { att: combatSide(b, att, def, aPos, def, { initiator: true }), def: combatSide(b, def, att, def, aPos) };
   }
 
   // 先制：守方 HP 比例 ≤ value% 時先出手
@@ -310,6 +377,11 @@
   function resolveCombat(b, att, def, rng) {
     const R = rulesOf(b);
     const fc = forecast(b, att, def);
+    const RU = rulesOf(b);
+    // 攻擊方面向目標；被攻擊方轉向攻擊者（規則可關）
+    const td = dirToward(att, def);
+    if (td != null) att.dir = td;
+    if (RU.facing && RU.facingTurn && def.hp > 0) { const dd = dirToward(def, att); if (dd != null) def.dir = dd; }
     const rounds = [];
     const first = fc.def && vantageActive(b, def) ? ['def', 'att'] : ['att', 'def'];
     for (const r of first) if (fc[r]) rounds.push(r);
@@ -335,7 +407,8 @@
       payCost(b, u, weaponOf(b, u));
     }
     const dead = [att, def].filter((u) => u.hp <= 0).map((u) => u.uid);
-    return { strikes, fc, dead, vantage: first[0] === 'def' };
+    delete att.chargeRun;
+    return { strikes, fc, dead, vantage: first[0] === 'def', charge: !!(fc.att && fc.att.charge) };
   }
 
   /* ---------- 地圖兵器 ---------- */
@@ -425,7 +498,7 @@
   }
 
   SRPG.rules = {
-    DEFAULT_RULES, TRIANGLE, EFFECTS, SKILL_EFFECTS, SUPPORT_BONUS, rulesOf, friendly, onMap,
+    DEFAULT_RULES, DIRS, dirToward, facingRelation, isFlier, heightAt, canCharge, positionBonus, TRIANGLE, EFFECTS, SKILL_EFFECTS, SUPPORT_BONUS, rulesOf, friendly, onMap,
     skillsOf, hasSkill, skillRate, terrainAt, moveCost, moveOf, unitAt, reachable, pathTo,
     weaponDef, weaponOf, weaponRange, canHitAt, isStaff, isMapWeapon, weaponCost, canAfford, payCost, usable,
     canAttackWith, attackWeapons, staves, mapWeapons, attackTilesFrom, threatTiles,

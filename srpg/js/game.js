@@ -96,6 +96,7 @@
     requestAnimationFrame(render);
     const b = G.battle;
     if (!b) return;
+    G.rules = R.rulesOf(b);
     RD.drawMap(ctx, G.campaign, b.map, now);
     G.vis = b.chapter.fog ? R.visibleTiles(b, 'player') : null;
     if (G.dangerAll && G.dangerTiles) RD.tint(ctx, G.dangerTiles, 'rgba(255,60,60,0.22)');
@@ -119,7 +120,7 @@
     for (const u of units) {
       const p = unitPixel(u);
       const dir = G.anim && G.anim.uid === u.uid && G.anim.dir != null ? G.anim.dir : undefined;
-      RD.drawUnit(ctx, G.campaign, u, p.x, p.y, now, { gray: u.acted && u.team === b.phase && !u.cantoMove, dir });
+      RD.drawUnit(ctx, G.campaign, u, p.x, p.y, now, { gray: u.acted && u.team === b.phase && !u.cantoMove, dir, facing: G.rules.facing });
       if (u.carrying) { ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'left'; ctx.textBaseline = 'bottom'; ctx.fillText('🫂', p.x + 1, p.y + TS - 6); }
     }
     // 霧
@@ -169,7 +170,7 @@
     if (!b) return;
     const u = seenUnitAt(G.cursor.x, G.cursor.y);
     UI.unitCard(u || (G.sel && B.byUid(b, G.sel)), b);
-    UI.terrainCard(R.terrainAt(b, G.cursor.x, G.cursor.y));
+    UI.terrainCard(R.terrainAt(b, G.cursor.x, G.cursor.y), R.heightAt(b, G.cursor.x, G.cursor.y));
   }
 
   /* ================= 動畫 ================= */
@@ -272,6 +273,7 @@
     await SP.preload(G.campaign);
     G.battle.flags = G.flags;
     resetSelection();
+    G.history = []; G.snap = null;
     resizeCanvas();
     const lord = G.battle.units.find((u) => u.team === 'player');
     if (lord) G.cursor = { x: lord.x, y: lord.y };
@@ -301,6 +303,11 @@
   // 每個行動後的共通檢查：事件、勝敗、回合自動結束
   async function afterAction() {
     const b = G.battle;
+    // 回溯：選取單位時的快照，在該單位行動完成後才算一步
+    if (G.snap && b.phase === 'player') {
+      const su = B.byUid(b, G.snap.uid);
+      if (!su || su.acted || su.hp <= 0) { (G.history = G.history || []).push(G.snap); if (G.history.length > 40) G.history.shift(); G.snap = null; }
+    }
     await drainQueue();
     if (b.status === 'victory') return chapterClear();
     if (b.status === 'defeat') return gameOver();
@@ -323,6 +330,14 @@
       playPhaseBgm();
       UI.sfx('phase');
       await UI.banner(B.PHASE_NAMES[b.phase], '第 ' + b.turn + ' 回合', color);
+      const amb = (b.phaseMsgs || []).filter((m) => m.ambush).map((m) => B.byUid(b, m.uid)).filter((u) => u && visible(u));
+      if (amb.length) {
+        UI.sfx('spirit');
+        for (const u of amb) fx(u.x, u.y, '伏兵！', '#ff6464');
+        UI.toast('伏兵出現了！');
+        await UI.sleep(600);
+      }
+      if (b.phase === 'player') G.history = [];
       await drainQueue();
       if (b.status !== 'playing') break;
       if (b.phase === 'player') break;
@@ -348,7 +363,11 @@
         if (path && (visible(u) || G.vis && path.some((p) => G.vis.has(p.x + ',' + p.y)))) await animateMove(u, path);
       }
       const t = plan.target && B.byUid(b, plan.target);
-      if (plan.map) await doMapAttack(u, plan.map.weapon, plan.map.at);
+      if (plan.escape) {
+        if (visible(u)) { fx(u.x, u.y, '逃走！', '#ffd24a'); await UI.sleep(400); }
+        B.escape(b, u);
+        UI.toast(u.name + ' 逃走了' + ((u.items || []).length ? '（帶走了 ' + u.items.map((it) => (G.campaign.items[it.id] || {}).name || it.id).join('、') + '）' : ''));
+      } else if (plan.map) await doMapAttack(u, plan.map.weapon, plan.map.at);
       else if (t && t.hp > 0) await doAttack(u, t);
       else if (plan.heal) await doHeal(u, B.byUid(b, plan.heal));
       else if (plan.item != null) await doItem(u, plan.item);
@@ -398,13 +417,16 @@
     const finals = { [u.uid]: u.hp, [t.uid]: t.hp };
     u.hp = before[u.uid]; t.hp = before[t.uid];
     if (wantScene(u, t, res.combat)) {
-      await SRPG.scene.play({ campaign: G.campaign, att: u, def: t, fc: res.combat.fc, strikes: res.combat.strikes, terrain: b.map.tiles[t.y][t.x], speed: speed() });
+      await SRPG.scene.play({ campaign: G.campaign, att: u, def: t, fc: res.combat.fc, strikes: res.combat.strikes, terrain: b.map.tiles[t.y][t.x], speed: speed(),
+        anim: res.combat.charge && G.campaign.animations.charge ? 'charge' : undefined });
       u.hp = finals[u.uid]; t.hp = finals[t.uid];
       for (const d of res.deaths) fx(d.x, d.y, '擊破', '#ffffff');
+      await showLoot(u, res);
       await showGains(res);
       updateHud();
       return;
     }
+    if (res.combat.charge) { fx(u.x, u.y - 0.5, '突進！', '#ffb347'); await UI.sleep(250 / speed()); }
     for (const s of res.combat.strikes) {
       const by = B.byUid(b, s.by), tg = B.byUid(b, s.target);
       await lunge(by, tg);
@@ -423,8 +445,17 @@
       fx(d.x, d.y, '擊破', '#ffffff');
     }
     if (res.deaths.length) { UI.sfx('death'); await UI.sleep(500); }
+    await showLoot(u, res);
     await showGains(res);
     updateHud();
+  }
+
+  async function showLoot(u, res) {
+    if (!res.loot || !res.loot.length) return;
+    const who = B.byUid(G.battle, res.lootBy);
+    UI.sfx('buy');
+    UI.toast((who ? who.name : '') + ' 取得 ' + res.loot.join('、'));
+    await UI.sleep(300);
   }
 
   // 戰鬥演出設定：on 全部播放 / special 只播有頭像切入的必殺演出 / off 關閉
@@ -703,6 +734,7 @@
     }
     if (G.mode === 'idle') {
       if (u && u.team === 'player' && !u.acted) {
+        if (G.rules && G.rules.rewind) G.snap = { uid: u.uid, battle: B.serialize(b), gold: G.gold, convoy: U.clone(G.convoy) };
         G.view = null; G.sel = u.uid;
         G.threat = R.threatTiles(b, u); G.reach = G.threat.reach;
         G.mode = 'move'; setCursor(x, y);
@@ -886,11 +918,34 @@
         return postAction(me);
       }
       case 'visit': G.mode = 'busy'; B.visit(b, me); return postAction(me);
+      case 'turn': {
+        const names = ['↓ 下', '← 左', '→ 右', '↑ 上'];
+        const d = await menuAt([3, 1, 2, 0].map((i) => ({ id: i, name: names[i] + (me.dir === i ? '（目前）' : '') })));
+        if (d != null) B.turnTo(me, d);
+        return actionMenu(me);
+      }
       case 'seize': G.mode = 'busy'; B.seize(b, me); break;
       default: B.wait(b, me);
     }
     resetSelection();
     await afterAction();
+  }
+
+  function rewind() {
+    const snap = (G.history || []).pop();
+    if (!snap || B.rewindsLeft(G.battle) <= 0) return;
+    G.battle = B.rewindTo(G.battle, snap.battle);
+    G.flags = G.battle.flags;
+    G.gold = snap.gold; G.convoy = snap.convoy;
+    G.snap = null; G.fx = [];
+    resetSelection();
+    G.mode = 'idle';
+    UI.sfx('cancel');
+    const left = B.rewindsLeft(G.battle);
+    UI.toast('回到上一步' + (left === Infinity ? '' : `（剩 ${left} 次）`));
+    const u = B.byUid(G.battle, snap.uid);
+    if (u) setCursor(u.x, u.y);
+    updateHud();
   }
 
   async function cancel() {
@@ -908,6 +963,7 @@
       { id: 'end', name: '⏭ 結束回合' },
       { id: 'danger', name: (G.dangerAll ? '隱藏' : '顯示') + '危險範圍' },
       ...(window.innerWidth < 720 ? [{ id: 'zin', name: '🔍 放大地圖' }, { id: 'zout', name: '🔍 縮小地圖' }, { id: 'zfit', name: '⤢ 符合畫面' }] : []),
+      ...(B.rewindsLeft(G.battle) > 0 && (G.history || []).length ? [{ id: 'rewind', name: '⏪ 回到上一步', note: B.rewindsLeft(G.battle) === Infinity ? '' : '剩 ' + B.rewindsLeft(G.battle) }] : []),
       { id: 'save', name: '💾 中斷存檔' },
       { id: 'settings', name: '⚙ 設定' },
       { id: 'title', name: '↩ 回到標題' },
@@ -917,6 +973,7 @@
     else if (id === 'danger') G.dangerAll = !G.dangerAll;
     else if (id === 'save') showSaveScreen('中斷存檔', true, null);
     else if (id === 'settings') showSettings();
+    else if (id === 'rewind') rewind();
     else if (id === 'zin') zoomStep(1);
     else if (id === 'zout') zoomStep(-1);
     else if (id === 'zfit') { SET.set('zoom', 0); applyZoom(); }
